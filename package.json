@@ -1,0 +1,17 @@
+{
+  "name": "dexstock-film",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts DexstockFilm out/dexstock-film.mp4 --browser-executable=/usr/local/bin/google-chrome --codec=h264 --crf=16 --concurrency=2"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.300",
+    "@remotion/google-fonts": "4.0.300",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.300"
+  },
+  "devDependencies": { "@types/react": "18.3.3", "typescript": "5.6.3" }
+}

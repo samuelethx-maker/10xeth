@@ -1,0 +1,14 @@
+{
+  "fps": 60,
+  "duration": 30,
+  "vo": [
+    {"file": "s1.wav", "at": 0.55, "phrases": [[0, "This is Dexstock."], [1.39, "The all-in-one app for trading tokenised stocks"], [4.43, "on-chain."]]},
+    {"file": "s2.wav", "at": 6.1, "phrases": [[0, "Trade real stocks on Robinhood Chain."], [2.39, "Nights."], [3.12, "Weekends."], [3.72, "Holidays."]]},
+    {"file": "s3.wav", "at": 11.25, "phrases": [[0, "Fully self-custodied."], [1.55, "Your wallet."], [2.51, "Your assets."], [3.59, "No middleman."], [4.75, "Zero fees."]]},
+    {"file": "s4.wav", "at": 17.45, "phrases": [[0, "Build strategies."], [1.41, "Trade from a pro terminal."], [3.16, "AI news."], [4.37, "Baskets."]]},
+    {"file": "s5.wav", "at": 23.05, "phrases": [[0, "Professional trading,"], [1.37, "fully on-chain."]]},
+    {"file": "s6.wav", "at": 26.45, "phrases": [[0, "Dexstock."], [0.99, "Always open."]]}
+  ],
+  "scenes": {"hook": 0, "always": 5.9, "custody": 11.05, "features": 17.25, "build": 22.85, "end": 26.15},
+  "hits": [5.9, 11.05, 17.25, 18.86, 20.61, 21.82, 22.85, 26.15]
+}
