@@ -31,8 +31,8 @@
   ];
 
   const load = () => {
-    try { const s = JSON.parse(localStorage.getItem(STORE)); if (s && s.threads) return s; } catch {}
-    return { threads: seedThreads(), model: 'GPT-6 Luna', effort: 'Default', repo: REPOS[0], sort: 'recent', automations: {} };
+    try { const s = JSON.parse(localStorage.getItem(STORE)); if (s && s.threads) return { folders: [], ...s }; } catch {}
+    return { threads: seedThreads(), folders: [], model: 'GPT-6 Luna', effort: 'Default', repo: REPOS[0], sort: 'recent', automations: {} };
   };
   const state = load();
   const ui = { view: 'home', threadId: null, query: '', files: [] };
@@ -53,6 +53,7 @@
     tick: '<svg viewBox="0 0 24 24" class="check"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>',
     stepDone: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.3 2.3 4.7-4.8"/></svg>',
     stepPending: '<svg viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5"/></svg>',
+    folder: '<svg viewBox="0 0 24 24" class="folder-ico fill"><path d="M3 7.2A2.2 2.2 0 0 1 5.2 5h3.9c.6 0 1.1.2 1.5.6L12 7h6.8A2.2 2.2 0 0 1 21 9.2v8.6a2.2 2.2 0 0 1-2.2 2.2H5.2A2.2 2.2 0 0 1 3 17.8V7.2Z"/></svg>',
     pr: '<svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.2"/><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M6 8.2v7.6M18 15.8V10a3 3 0 0 0-3-3h-4M13 4.5 10.5 7l2.5 2.5"/></svg>',
   };
 
@@ -80,7 +81,7 @@
     }
   }, { passive: true });
   device.addEventListener('touchmove', (e) => {
-    if (!drag) return;
+    if (!drag || dnd) return;
     const dx = e.touches[0].clientX - drag.x0, dy = e.touches[0].clientY - drag.y0;
     if (!drag.active) {
       if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) { drag = null; return; }
@@ -106,18 +107,144 @@
   });
 
   /* ---------- thread list ---------- */
-  const renderThreads = () => {
-    const q = ui.query.trim().toLowerCase();
-    let list = state.threads.filter((t) => !q || t.title.toLowerCase().includes(q) || (t.prompt || '').toLowerCase().includes(q));
-    list = list.slice().sort((a, b) => state.sort === 'az' ? a.title.localeCompare(b.title) : b.at - a.at);
-    $('#threadList').innerHTML = list.length ? list.map((t) => `
-      <li><button class="thread-item ${ui.view === 'thread' && ui.threadId === t.id ? 'active' : ''}" data-action="open-thread" data-id="${t.id}">
+  const byThread = (id) => state.threads.find((t) => t.id === id);
+  const folderOf = (id) => state.folders.find((f) => f.ids.includes(id));
+  // Drop dangling ids and dissolve folders left with fewer than two threads.
+  const tidyFolders = () => {
+    state.folders.forEach((f) => { f.ids = f.ids.filter(byThread); });
+    state.folders = state.folders.filter((f) => f.ids.length > 1);
+  };
+  const cmp = (a, b) => state.sort === 'az' ? a.title.localeCompare(b.title) : b.at - a.at;
+
+  const threadRow = (t) => `
+      <li><button class="thread-item ${ui.view === 'thread' && ui.threadId === t.id ? 'active' : ''} ${t.status === 'running' ? 'unread' : ''}" data-action="open-thread" data-id="${t.id}">
         ${t.status === 'running' ? ICON.running : ICON.check}
         <span class="t-title">${esc(t.title)}</span>
         <span class="t-time">${ago(t.at)}</span>
         <span class="t-sub"><span class="avatar">S</span>${t.status === 'running' ? 'Running' : 'Ready'}</span>
-      </button></li>`).join('') : `<li class="empty">${q ? 'No threads match “' + esc(ui.query) + '”' : 'No threads yet'}</li>`;
+      </button></li>`;
+
+  const folderRow = (f, kids) => {
+    const running = kids.filter((t) => t.status === 'running').length;
+    const hasActive = ui.view === 'thread' && f.ids.includes(ui.threadId);
+    const mini = kids.slice(0, 4).map((t) => `<i class="${t.status === 'running' ? 'run' : ''}"></i>`).join('');
+    return `
+      <li class="folder ${f.open ? 'open' : ''} ${f.fresh ? 'fresh' : ''}" data-folder-id="${f.id}">
+        <div class="folder-head-row">
+          <button class="folder-head ${!f.open && hasActive ? 'active' : ''} ${!f.open && running ? 'unread' : ''}" data-action="toggle-folder" data-id="${f.id}">
+            ${f.open ? ICON.folder : `<span class="folder-tile">${mini}</span>`}
+            <span class="t-title">${esc(f.name)}</span>
+            <span class="t-time">${kids.length}</span>
+            ${f.open ? '' : `<span class="t-sub">${kids.length} threads${running ? ` · ${running} running` : ''}</span>`}
+          </button>
+          ${f.open ? `<button class="icon-btn folder-more" data-action="folder-more" data-id="${f.id}" aria-label="Folder options"><svg viewBox="0 0 24 24" class="fill"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg></button>` : ''}
+        </div>
+        ${f.open ? `<ul class="folder-items">${kids.map(threadRow).join('')}</ul>` : ''}
+      </li>`;
   };
+
+  const renderThreads = () => {
+    const q = ui.query.trim().toLowerCase();
+    if (q) {
+      const list = state.threads.filter((t) => t.title.toLowerCase().includes(q) || (t.prompt || '').toLowerCase().includes(q)).sort(cmp);
+      $('#threadList').innerHTML = list.length ? list.map(threadRow).join('') : `<li class="empty">No threads match “${esc(ui.query)}”</li>`;
+      return;
+    }
+    const grouped = new Set(state.folders.flatMap((f) => f.ids));
+    const entries = [
+      ...state.threads.filter((t) => !grouped.has(t.id)).map((t) => ({ title: t.title, at: t.at, html: () => threadRow(t) })),
+      ...state.folders.map((f) => {
+        const kids = f.ids.map(byThread).filter(Boolean).sort(cmp);
+        return { title: f.name, at: Math.max(...kids.map((t) => t.at)), html: () => folderRow(f, kids) };
+      }),
+    ].sort(cmp);
+    $('#threadList').innerHTML = entries.length ? entries.map((e) => e.html()).join('') : '<li class="empty">No threads yet</li>';
+    state.folders.forEach((f) => delete f.fresh);
+  };
+
+  /* ---------- drag a thread onto another to make a folder ---------- */
+  const list = $('#threadList');
+  let press = null, dnd = null, swallowClick = false;
+  const endPress = () => { if (press) clearTimeout(press.timer); press = null; };
+
+  list.addEventListener('pointerdown', (e) => {
+    const item = e.target.closest('.thread-item');
+    if (!item || ui.query || e.button > 0) return;
+    press = { item, id: item.dataset.id, x: e.clientX, y: e.clientY, timer: setTimeout(() => startDnd(), 380) };
+  });
+  list.addEventListener('contextmenu', (e) => { if (e.target.closest('.thread-item')) e.preventDefault(); });
+
+  const startDnd = () => {
+    const { item, id, x, y } = press; press = null;
+    const r = item.getBoundingClientRect();
+    const ghost = item.cloneNode(true);
+    ghost.classList.add('drag-ghost');
+    ghost.style.width = r.width + 'px';
+    document.body.appendChild(ghost);
+    item.classList.add('drag-src');
+    list.classList.add('dnd');
+    dnd = { id, item, ghost, ox: x - r.left, oy: y - r.top, target: null, from: folderOf(id) };
+    moveDnd(x, y);
+    navigator.vibrate?.(10);
+  };
+
+  const moveDnd = (x, y) => {
+    dnd.ghost.style.transform = `translate(${x - dnd.ox}px, ${y - dnd.oy}px) scale(1.03)`;
+    const under = document.elementFromPoint(x, y);
+    const row = under?.closest('.thread-item, .folder');
+    let target = null;
+    if (row && list.contains(row)) {
+      if (row.classList.contains('thread-item') && row.dataset.id !== dnd.id) target = row;
+      else if (row.classList.contains('folder') && (!dnd.from || row.dataset.folderId !== dnd.from.id)) target = row;
+    }
+    // Dragging a thread out of its folder: the folder fades to show it will leave.
+    const leaving = dnd.from && !under?.closest(`[data-folder-id="${dnd.from.id}"]`);
+    list.querySelectorAll('.drop-target, .drop-leave').forEach((el) => el.classList.remove('drop-target', 'drop-leave'));
+    if (target && target.classList.contains('thread-item') && dnd.from && folderOf(target.dataset.id) === dnd.from) target = null;
+    target?.classList.add('drop-target');
+    if (leaving && !target) list.querySelector(`[data-folder-id="${dnd.from.id}"]`)?.classList.add('drop-leave');
+    dnd.target = target; dnd.leaving = leaving;
+  };
+
+  const dropDnd = () => {
+    const { id, target, from, leaving } = dnd;
+    let msg = '';
+    if (target) {
+      const into = target.classList.contains('folder')
+        ? state.folders.find((f) => f.id === target.dataset.folderId)
+        : folderOf(target.dataset.id);
+      if (from) from.ids = from.ids.filter((x) => x !== id);
+      if (into) { into.ids.push(id); msg = `Added to ${into.name}`; }
+      else {
+        state.folders.push({ id: 'f' + Date.now(), name: 'Folder ' + (state.folders.length + 1), ids: [target.dataset.id, id], open: false, fresh: true });
+        msg = 'Folder created';
+      }
+    } else if (from && leaving) {
+      from.ids = from.ids.filter((x) => x !== id);
+      msg = from.ids.length < 2 ? 'Folder removed' : `Removed from ${from.name}`;
+    }
+    cancelDnd();
+    if (msg) { tidyFolders(); save(); renderThreads(); toast(msg); }
+  };
+
+  const cancelDnd = () => {
+    if (!dnd) return;
+    dnd.ghost.remove();
+    list.classList.remove('dnd');
+    list.querySelectorAll('.drag-src, .drop-target, .drop-leave').forEach((el) => el.classList.remove('drag-src', 'drop-target', 'drop-leave'));
+    dnd = null; swallowClick = true;
+    setTimeout(() => { swallowClick = false; }, 0);
+  };
+
+  window.addEventListener('pointermove', (e) => {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) endPress();
+    if (dnd) moveDnd(e.clientX, e.clientY);
+  });
+  window.addEventListener('pointerup', () => { endPress(); if (dnd) dropDnd(); });
+  window.addEventListener('pointercancel', () => { endPress(); cancelDnd(); });
+  // Keep the list from scrolling while a thread is being dragged on touch screens.
+  list.addEventListener('touchmove', (e) => { if (dnd) e.preventDefault(); }, { passive: false });
+  document.addEventListener('click', (e) => { if (swallowClick) { e.stopPropagation(); e.preventDefault(); } }, true);
   const closeSearch = () => {
     $('#searchRow').hidden = true; ui.query = ''; $('#searchInput').value = ''; renderThreads();
   };
@@ -260,7 +387,26 @@
 
   /* ---------- actions ---------- */
   const actions = {
-    'toggle-drawer': () => setDrawer(!device.classList.contains('open')),
+    'toggle-drawer': () => {
+      const open = !device.classList.contains('open');
+      setDrawer(open);
+      if (open && !state.folderTip) {
+        state.folderTip = true; save();
+        setTimeout(() => toast('Tip: hold a thread and drop it on another to make a folder'), 500);
+      }
+    },
+    'toggle-folder': (el) => {
+      const f = state.folders.find((x) => x.id === el.dataset.id);
+      f.open = !f.open; save(); renderThreads();
+    },
+    'folder-more': (el) => {
+      const f = state.folders.find((x) => x.id === el.dataset.id);
+      openSheet(f.name, [
+        { label: 'Rename folder', go: () => { const n = prompt('Folder name', f.name); if (n && n.trim()) { f.name = n.trim(); save(); renderThreads(); } } },
+        { label: 'Collapse', go: () => { f.open = false; save(); renderThreads(); } },
+        { label: 'Ungroup threads', danger: true, go: () => { state.folders = state.folders.filter((x) => x !== f); save(); renderThreads(); toast('Folder removed'); } },
+      ], (o) => o.go());
+    },
     'close-drawer': () => setDrawer(false),
     'new-thread': () => { show('home'); setDrawer(false); setTimeout(() => $('#prompt').focus(), 420); },
     'open-thread': (el) => openThread(el.dataset.id),
@@ -293,7 +439,7 @@
         const n = prompt('Rename thread', t.title); if (n) { t.title = n.trim(); save(); renderThread(); renderThreads(); }
       } },
       { label: 'Archive thread', danger: true, go: () => {
-        state.threads = state.threads.filter((x) => x.id !== ui.threadId); save(); show('home'); toast('Thread archived');
+        state.threads = state.threads.filter((x) => x.id !== ui.threadId); tidyFolders(); save(); show('home'); toast('Thread archived');
       } },
     ], (o) => o.go()),
     attach: () => $('#fileInput').click(),
