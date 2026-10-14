@@ -177,7 +177,7 @@ svg.fill { fill: currentColor; stroke: none; }
 
 /* ---------- Toast ---------- */
 .toast { position: absolute; left: 50%; bottom: calc(110px + var(--safe-bottom)); transform: translate(-50%, 20px); opacity: 0; z-index: 100;
-  background: #f2f2f2; color: #111; padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 500; transition: .3s var(--ease); pointer-events: none; white-space: nowrap; }
+  background: #f2f2f2; color: #111; padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 500; transition: .3s var(--ease); pointer-events: none; width: max-content; max-width: calc(100% - 32px); text-align: center; line-height: 1.35; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 /* ---------- Thread folders ---------- */
