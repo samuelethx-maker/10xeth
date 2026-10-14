@@ -133,9 +133,9 @@
         <div class="folder-head-row">
           <button class="folder-head ${!f.open && hasActive ? 'active' : ''} ${!f.open && running ? 'unread' : ''}" data-action="toggle-folder" data-id="${f.id}">
             ${f.open ? ICON.folder : `<span class="folder-tile">${mini}</span>`}
-            ${f.open ? '<span></span>' : `<span class="t-title">${esc(kids[0].title)}</span>
-            <span class="t-time">${ago(kids[0].at)}</span>
-            <span class="t-sub folder-preview">${esc(kids.slice(1).map((t) => t.title).join(' · '))}</span>`}
+            <span class="t-title">${esc(f.name)}</span>
+            <span class="t-time">${kids.length}</span>
+            ${f.open ? '' : `<span class="t-sub">${kids.length} threads${running ? ` · ${running} running` : ''}</span>`}
           </button>
           ${f.open ? `<button class="icon-btn folder-more" data-action="folder-more" data-id="${f.id}" aria-label="Folder options"><svg viewBox="0 0 24 24" class="fill"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg></button>` : ''}
         </div>
@@ -155,7 +155,7 @@
       ...state.threads.filter((t) => !grouped.has(t.id)).map((t) => ({ title: t.title, at: t.at, html: () => threadRow(t) })),
       ...state.folders.map((f) => {
         const kids = f.ids.map(byThread).filter(Boolean).sort(cmp);
-        return { title: kids[0]?.title || '', at: Math.max(...kids.map((t) => t.at)), html: () => folderRow(f, kids) };
+        return { title: f.name, at: Math.max(...kids.map((t) => t.at)), html: () => folderRow(f, kids) };
       }),
     ].sort(cmp);
     $('#threadList').innerHTML = entries.length ? entries.map((e) => e.html()).join('') : '<li class="empty">No threads yet</li>';
@@ -214,14 +214,14 @@
         ? state.folders.find((f) => f.id === target.dataset.folderId)
         : folderOf(target.dataset.id);
       if (from) from.ids = from.ids.filter((x) => x !== id);
-      if (into) { into.ids.push(id); msg = 'Added to folder'; }
+      if (into) { into.ids.push(id); msg = `Added to ${into.name}`; }
       else {
-        state.folders.push({ id: 'f' + Date.now(), ids: [target.dataset.id, id], open: false, fresh: true });
+        state.folders.push({ id: 'f' + Date.now(), name: 'Folder ' + (state.folders.length + 1), ids: [target.dataset.id, id], open: false, fresh: true });
         msg = 'Folder created';
       }
     } else if (from && leaving) {
       from.ids = from.ids.filter((x) => x !== id);
-      msg = from.ids.length < 2 ? 'Folder removed' : 'Removed from folder';
+      msg = from.ids.length < 2 ? 'Folder removed' : `Removed from ${from.name}`;
     }
     cancelDnd();
     if (msg) { tidyFolders(); save(); renderThreads(); toast(msg); }
@@ -401,7 +401,8 @@
     },
     'folder-more': (el) => {
       const f = state.folders.find((x) => x.id === el.dataset.id);
-      openSheet('Folder', [
+      openSheet(f.name, [
+        { label: 'Rename folder', go: () => { const n = prompt('Folder name', f.name); if (n && n.trim()) { f.name = n.trim(); save(); renderThreads(); } } },
         { label: 'Collapse', go: () => { f.open = false; save(); renderThreads(); } },
         { label: 'Ungroup threads', danger: true, go: () => { state.folders = state.folders.filter((x) => x !== f); save(); renderThreads(); toast('Folder removed'); } },
       ], (o) => o.go());

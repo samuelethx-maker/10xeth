@@ -217,4 +217,3 @@ svg.fill { fill: currentColor; stroke: none; }
 .drop-target { background: #1f1f2b !important; box-shadow: inset 0 0 0 1.5px #6d78f7; }
 .folder.drop-target { border-radius: 16px; }
 .folder.drop-leave { opacity: .55; }
-.folder-preview { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block !important; }
