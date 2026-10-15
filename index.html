@@ -1,0 +1,928 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Web Design Inspiration Report — 15 Oct 2026</title><style>body{font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif;color:#1b1b1b;background:#fafaf7;margin:0}
+main{max-width:1080px;margin:0 auto;padding:40px 24px 120px}
+h1{font-size:2.6rem;line-height:1.1;letter-spacing:-.02em;margin:.2em 0 .4em}
+h2{font-size:1.7rem;margin-top:2.4em;border-top:2px solid #111;padding-top:.6em}
+h3{font-size:1.3rem;margin-top:2em}
+img{max-width:100%;border-radius:8px;box-shadow:0 2px 14px rgba(0,0,0,.12);vertical-align:top}
+p>img[alt$="mobile"]{width:180px;margin-left:12px}
+p:has(>img[alt$="desktop"]){display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+p:has(>img[alt$="desktop"])>img[alt$="desktop"]{width:calc(100% - 210px);min-width:300px}
+p:has(>img) em{flex-basis:100%;font-size:.85rem;color:#666;order:3}
+table{border-collapse:collapse;width:100%;font-size:.82rem;display:block;overflow-x:auto}
+th,td{border:1px solid #ddd;padding:6px 8px;vertical-align:top;text-align:left}
+th{background:#111;color:#fff;position:sticky;top:0}
+tr:nth-child(even) td{background:#f1f1ec}
+blockquote{border-left:4px solid #c8ff00;margin:1em 0;padding:.4em 1em;background:#fff}
+code{background:#eee;padding:1px 5px;border-radius:4px;font-size:.88em}
+hr{border:0;border-top:1px solid #ddd;margin:2em 0}
+a{color:#2a4bd7}</style></head><body><main><h1>Web Design Inspiration Report: 20 Exceptional Websites</h1>
+<p><strong>Research date:</strong> 15 October 2026 (UTC)<br><strong>Scope:</strong> 20 live websites across 11+ countries of origin, 15+ industries, and a deliberate spread of styles, from immersive WebGL to plain, fast HTML.</p>
+<p><img src="images/00-contact-sheet.jpg" alt="Contact sheet of all 20 sites"></p>
+<hr>
+<h2 id="how-to-read-this-report">How to read this report</h2>
+<p>Every claim carries one of three labels:</p>
+<table>
+<thead>
+<tr>
+<th>Label</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Observed</strong></td>
+<td>I saw it directly in a headless Chrome session on the research date, or in the page&#39;s HTML/DOM.</td>
+</tr>
+<tr>
+<td><strong>Source</strong></td>
+<td>Taken from an award platform&#39;s page (mostly Awwwards), the creator&#39;s own site, or an official announcement. Linked in <a href="#sources">Sources</a>.</td>
+</tr>
+<tr>
+<td><strong>Unverified</strong></td>
+<td>Reported somewhere (LinkedIn posts, press, a research summary) but not confirmed against a primary source. Treat with caution.</td>
+</tr>
+</tbody></table>
+<h3 id="method-and-limits">Method and limits</h3>
+<ul>
+<li><strong>Captures.</strong> Chrome 1440×900 (desktop) and 390×844 at 2× with an iPhone user-agent (mobile emulation, not a real device). Each page was given 8–40 seconds to settle.</li>
+<li><strong>WebGL caveat (important).</strong> The sandbox had no GPU, so WebGL ran on a software renderer (SwiftShader). Heavy 3D sites (Igloo, Bruno Simon, Garden Eight, Lando Norris&#39;s 3D helmet) didn&#39;t finish rendering. <strong>This tells you nothing about their speed on a real phone or laptop.</strong> Where a capture failed, I used the site&#39;s own social-sharing (Open Graph) image and labelled it <strong>&quot;site-provided image&quot;</strong>.</li>
+<li><strong>DOM checks</strong> (automated, per page): <code>&lt;h1&gt;</code> count, images missing <code>alt</code>, <code>&lt;nav&gt;</code>/<code>&lt;main&gt;</code> landmarks, skip link, unnamed buttons/links, whether zoom is disabled in the viewport tag, whether any CSS responds to <code>prefers-reduced-motion</code>, horizontal overflow on mobile, and resource transfer size.<ul>
+<li><strong>Transfer sizes are lower bounds.</strong> Cross-origin assets often report 0 bytes, and measurement stopped at the capture time. I quote them only where they&#39;re clearly large.</li>
+</ul>
+</li>
+<li><strong>Not done:</strong> no Lighthouse or Core Web Vitals on real hardware, no screen-reader walkthrough, no colour-contrast measurement. Accessibility notes are signals to investigate, not audit verdicts.</li>
+<li><strong>Award scores.</strong> Awwwards publishes jury sub-scores (Design 40%, Usability 30%, Creativity 20%, Content 10%). I quote the <strong>Usability</strong> sub-score because it&#39;s the most useful counterweight to visual spectacle.</li>
+</ul>
+<hr>
+<h2 id="1-comparison-table">1. Comparison table</h2>
+<p>Key: <strong>3D</strong> = WebGL-led experience. <strong>Zoom off</strong> = the viewport tag blocks pinch-zoom (an accessibility problem; WCAG 1.4.4). <strong>RM</strong> = CSS that responds to <code>prefers-reduced-motion</code> was detected.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Site</th>
+<th>Origin (studio)</th>
+<th>Industry</th>
+<th>Style</th>
+<th>Signature idea</th>
+<th>Weight</th>
+<th>Mobile (observed)</th>
+<th>Accessibility flags (observed)</th>
+<th>Headline award (source)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><a target="_blank" rel="noopener" href="https://landonorris.com">Lando Norris</a></td>
+<td>UK (OFF+BRAND)</td>
+<td>Sport / athlete</td>
+<td>Editorial + 3D</td>
+<td>Serif/grotesk wordmark, topographic lines, &quot;next race&quot; card</td>
+<td>Medium</td>
+<td>Re-stacks cleanly</td>
+<td>Images have alt; no skip link; no RM</td>
+<td>Awwwards <strong>SOTY 2025</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td><a target="_blank" rel="noopener" href="https://messenger.abeto.co">Messenger</a></td>
+<td>US (abeto)</td>
+<td>Experimental / game</td>
+<td>Toon-shaded 3D</td>
+<td>A tiny multiplayer planet you deliver mail on</td>
+<td>Heavy (≥5.7 MB)</td>
+<td>Planet renders</td>
+<td><strong>No DOM text at all</strong></td>
+<td>Awwwards <strong>Dev SOTY 2025</strong></td>
+</tr>
+<tr>
+<td>3</td>
+<td><a target="_blank" rel="noopener" href="https://www.igloo.inc">Igloo Inc</a></td>
+<td>US (abeto + Bureaux)</td>
+<td>Web3 / venture</td>
+<td>Icy 3D + mono type</td>
+<td>Ice-and-snow world as company metaphor</td>
+<td>Very heavy (≥15 MB)</td>
+<td>Didn&#39;t render here</td>
+<td>Empty <code>&lt;body&gt;</code>; no headings or text</td>
+<td>Awwwards <strong>SOTY 2024</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td><a target="_blank" rel="noopener" href="https://lusion.co">Lusion</a></td>
+<td>UK</td>
+<td>Creative studio</td>
+<td>3D + Swiss</td>
+<td>Physics &quot;toy box&quot; hero, numeric loader</td>
+<td>Medium–heavy</td>
+<td>Loader only here</td>
+<td><strong>Zoom off</strong>; no nav/main landmarks</td>
+<td>Awwwards <strong>SOTY 2023</strong></td>
+</tr>
+<tr>
+<td>5</td>
+<td><a target="_blank" rel="noopener" href="https://immersive-g.com">Immersive Garden</a></td>
+<td>France</td>
+<td>Creative studio (luxury)</td>
+<td>Luxury minimal</td>
+<td>Serif restraint around heavy WebGL case studies</td>
+<td>Very heavy (≥21 MB)</td>
+<td>Loader</td>
+<td><strong>Zoom off</strong>; 39/39 images lack alt</td>
+<td>Awwwards Agency of the Year 2025</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a target="_blank" rel="noopener" href="https://locomotive.ca/en">Locomotive</a></td>
+<td>Canada</td>
+<td>Creative agency</td>
+<td>Editorial / video</td>
+<td>Serif + mono over full-bleed video</td>
+<td>Medium</td>
+<td>Headline over busy video</td>
+<td>RM present; landmarks present</td>
+<td>Awwwards Agency of the Year 2024</td>
+</tr>
+<tr>
+<td>7</td>
+<td><a target="_blank" rel="noopener" href="https://www.scoutmotors.com">Scout Motors</a></td>
+<td>US (Locomotive)</td>
+<td>Automotive</td>
+<td>Cinematic heritage</td>
+<td>Dusk landscape video, floating segmented nav</td>
+<td>Medium</td>
+<td>Cookie modal covers hero</td>
+<td>17 unnamed controls; RM present</td>
+<td>Awwwards <strong>E-commerce of the Year 2025</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td><a target="_blank" rel="noopener" href="https://bruno-simon.com">Bruno Simon</a></td>
+<td>France</td>
+<td>Developer portfolio</td>
+<td>Game world</td>
+<td>Drive a toy truck through the portfolio</td>
+<td>Heavy (≥7 MB)</td>
+<td>Touch controls documented</td>
+<td>No h1; 41/44 images lack alt</td>
+<td>Awwwards SOTM Jan 2026 (+2019 SOTM)</td>
+</tr>
+<tr>
+<td>9</td>
+<td><a target="_blank" rel="noopener" href="https://basement.studio">basement.studio</a></td>
+<td>Argentina</td>
+<td>Creative studio</td>
+<td>Wireframe 3D + brutal type</td>
+<td><strong>HUMAN / MACHINE</strong> toggle → plain-HTML twin</td>
+<td>Heavy (≥16 MB)</td>
+<td>Toggle overlaps headline</td>
+<td>RM present; landmarks present</td>
+<td>Awwwards SOTD Apr 2025</td>
+</tr>
+<tr>
+<td>10</td>
+<td><a target="_blank" rel="noopener" href="https://garden-eight.com">Garden Eight</a></td>
+<td>Japan</td>
+<td>Creative studio</td>
+<td>Quiet 3D, katakana mark</td>
+<td>Bilingual (EN/JA) minimalist studio site</td>
+<td>Medium</td>
+<td>Didn&#39;t render here</td>
+<td><strong>Zoom off</strong></td>
+<td>Awwwards SOTD 2022 &amp; 2017</td>
+</tr>
+<tr>
+<td>11</td>
+<td><a target="_blank" rel="noopener" href="https://tengilemalamala.com">Tengile MalaMala</a></td>
+<td>South Africa (DashDigital)</td>
+<td>Hospitality / conservation</td>
+<td>Warm luxury editorial</td>
+<td>Aerial river film + thin serif &quot;UNMATCHED ABUNDANCE&quot;</td>
+<td>Light–medium</td>
+<td>Excellent</td>
+<td><strong>Skip link</strong>; full landmarks; images have alt</td>
+<td>Awwwards SOTD 3 Oct 2026</td>
+</tr>
+<tr>
+<td>12</td>
+<td><a target="_blank" rel="noopener" href="https://coloniazacamil.com">Colonia Zacamil</a></td>
+<td>El Salvador project (Adoratorio)</td>
+<td>Civic / public art</td>
+<td>Condensed type + 3D map</td>
+<td>&quot;FLY TO ZACAMIL&quot; — map of murals with past/present switch</td>
+<td>Heavy (≥5.7 MB)</td>
+<td>Type re-stacks well</td>
+<td><strong>Zoom off</strong>; no headings</td>
+<td>Awwwards SOTD 1 Oct 2026</td>
+</tr>
+<tr>
+<td>13</td>
+<td><a target="_blank" rel="noopener" href="https://pudding.cool">The Pudding</a></td>
+<td>US</td>
+<td>Data journalism</td>
+<td>Playful editorial</td>
+<td>Numbered &quot;issues,&quot; sticker-like nav icons</td>
+<td>Medium</td>
+<td>Very good</td>
+<td>No h1 on index; RM present; skip link</td>
+<td>Webby Honoree 2019</td>
+</tr>
+<tr>
+<td>14</td>
+<td><a target="_blank" rel="noopener" href="https://ciechanow.ski/mechanical-watch/">Bartosz Ciechanowski</a></td>
+<td>Poland (solo)</td>
+<td>Education / explainers</td>
+<td>Plain reading layout + 3D figures</td>
+<td>Dozens of draggable, inline interactive diagrams</td>
+<td>Medium (~2 MB)</td>
+<td>Excellent reading</td>
+<td>13/13 images without alt; no landmarks</td>
+<td>None verified</td>
+</tr>
+<tr>
+<td>15</td>
+<td><a target="_blank" rel="noopener" href="https://learningsynths.ableton.com">Ableton Learning Synths</a></td>
+<td>Germany</td>
+<td>Music education</td>
+<td>Flat, colourful, didactic</td>
+<td>Playable synth in the first viewport</td>
+<td>Light (~1 MB)</td>
+<td>&quot;Unmute your device&quot; prompt</td>
+<td><strong>Zoom off</strong></td>
+<td>Learning Music: Awwwards HM 2017</td>
+</tr>
+<tr>
+<td>16</td>
+<td><a target="_blank" rel="noopener" href="https://teenage.engineering">Teenage Engineering</a></td>
+<td>Sweden</td>
+<td>Consumer electronics</td>
+<td>Monochrome industrial</td>
+<td>Lowercase nav with pictograms + Japanese micro-copy</td>
+<td>Light</td>
+<td>Minimal, clean</td>
+<td><strong>Zoom off</strong>; RM present</td>
+<td>None verified</td>
+</tr>
+<tr>
+<td>17</td>
+<td><a target="_blank" rel="noopener" href="https://linear.app">Linear</a></td>
+<td>US</td>
+<td>B2B SaaS</td>
+<td>Dark, precise</td>
+<td>The real product UI <em>is</em> the hero</td>
+<td>Light</td>
+<td>Excellent</td>
+<td>Skip link; landmarks; RM present</td>
+<td>None verified</td>
+</tr>
+<tr>
+<td>18</td>
+<td><a target="_blank" rel="noopener" href="https://stripe.com">Stripe</a></td>
+<td>US</td>
+<td>Fintech</td>
+<td>Gradient + clarity</td>
+<td>Animated colour ribbon + live &quot;GDP on Stripe&quot; counter</td>
+<td>Medium</td>
+<td>Excellent</td>
+<td>Two h1s; no RM detected</td>
+<td>(Stripe.com: Awwwards nominee)</td>
+</tr>
+<tr>
+<td>19</td>
+<td><a target="_blank" rel="noopener" href="https://www.gov.uk">GOV.UK</a></td>
+<td>UK (GDS)</td>
+<td>Government</td>
+<td>Utilitarian</td>
+<td>Search-first, one typeface, one blue</td>
+<td>Lightest measured (≥0.2 MB)</td>
+<td>Excellent</td>
+<td>Skip link; landmarks; RM; balanced cookie choice</td>
+<td>Design of the Year 2013 (Design Museum)</td>
+</tr>
+<tr>
+<td>20</td>
+<td><a target="_blank" rel="noopener" href="https://poolsuite.net">Poolsuite</a></td>
+<td>Unverified (Marty Bell)</td>
+<td>Music / lifestyle</td>
+<td>Retro OS / nostalgia</td>
+<td>1990s desktop as a music app</td>
+<td>Medium (~4 MB)</td>
+<td><strong>Player window clipped</strong></td>
+<td>73/133 images lack alt; no h1</td>
+<td>Product Hunt Golden Kitty 2020 (app)</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><strong>Excluded: Opal Tadpole</strong> (Awwwards E-commerce of the Year 2024). <code>opalcamera.com/tadpole</code> now redirects to <code>op.al</code>, which shows a company story page (&quot;the table&quot;). Every Tadpole path I tried returned 404. It&#39;s no longer accessible, so it isn&#39;t reviewed.</p>
+</blockquote>
+<hr>
+<h2 id="2-individual-reviews">2. Individual reviews</h2>
+<h3 id="immersive-3d-led">Immersive &amp; 3D-led</h3>
+<hr>
+<h3 id="1-lando-norris-landonorris-com">1. Lando Norris — <a target="_blank" rel="noopener" href="https://landonorris.com">landonorris.com</a></h3>
+<p><img src="images/01-lando-desktop.jpg" alt="Lando Norris desktop">
+<em>Observed capture, desktop. The 3D helmet layer didn&#39;t render under software WebGL; only the topographic layer is shown.</em> <img src="images/01-lando-mobile.jpg" alt="Lando Norris mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> Personal brand, fan hub and store for the McLaren Formula 1 driver. Sport and athlete.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Typography (observed):</strong> The wordmark pairs a high-contrast serif &quot;LANDO&quot; with a heavy grotesk &quot;NORRIS&quot;. The DOM lists <em>Mona Sans Variable</em> and <em>Brier</em>; I infer Brier is the serif. It reads as part fashion magazine, part race livery.</li>
+<li><strong>Colour (observed):</strong> Off-white canvas with grey topographic contour lines, plus a single acid-lime accent used only for the STORE button. One accent, used once.</li>
+<li><strong>Content as interface (observed):</strong> A small &quot;NEXT RACE · AUSTIN GP&quot; card with a track outline and a &quot;McLaren F1 since 2019&quot; laurel. It gives the site a live, seasonal reason to revisit.</li>
+<li><strong>Storytelling (observed):</strong> Sections run &quot;Message from Lando&quot; → On Track → Off Track → Helmets → Hall of Fame → Store → Partners → Socials. That&#39;s a clear narrative arc from person to performance to commerce.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Navigation: Home, On Track, Off Track, Calendar, Store, behind a menu button. The persistent STORE CTA is never more than a glance away.</li>
+<li>Mobile: the wordmark re-centres, CTA buttons become large thumb targets, and a pointer/hand hint appears bottom-right.</li>
+<li>1 <code>&lt;h1&gt;</code>, 40 headings, all 133 images carry <code>alt</code>, <code>&lt;main&gt;</code> present. Missing: skip link, <code>&lt;nav&gt;</code> landmark, reduced-motion handling.</li>
+<li>21 <code>&lt;canvas&gt;</code> elements on one page, which is a lot of animated layers for low-end phones. I couldn&#39;t measure the real-device impact.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Pair one expressive serif with one sturdy grotesk to give a personal brand both personality and punch.</li>
+<li>Reserve your brightest colour for the action you most want taken.</li>
+<li>Put a time-sensitive &quot;now&quot; module (next race, next event, next drop) in the first viewport.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> OFF+BRAND (London). Awwwards SOTD 17 Nov 2025: 8.18 overall, Usability 7.90, Creativity 8.71. Awwwards <strong>Site of the Year 2025</strong> and <strong>Users&#39; Choice 2025</strong>. Awwwards lists Webflow, GSAP and WebGL.</p>
+<hr>
+<h3 id="2-messenger-messenger-abeto-co">2. Messenger — <a target="_blank" rel="noopener" href="https://messenger.abeto.co">messenger.abeto.co</a></h3>
+<p><img src="images/02-messenger-desktop.jpg" alt="Messenger desktop">
+<em>Observed capture: the planet after the intro transition.</em> <img src="images/02-messenger-mobile.jpg" alt="Messenger mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> A self-initiated browser game and experiment (&quot;It&#39;s a small planet, but someone&#39;s gotta make the deliveries&quot; — page description). Experimental, entertainment, studio showcase.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Art direction (observed):</strong> A cel-shaded miniature planet of houses, trees and harbours floating in flat teal. It&#39;s illustrated, not photoreal, which keeps the scene readable at tiny sizes and is kinder to GPUs.</li>
+<li><strong>Transitions (observed):</strong> The intro is a hard diagonal teal wipe, then a pull-in on the planet. It&#39;s simple geometry, not a spinner.</li>
+<li><strong>Interaction (source):</strong> Awwwards lists WebSockets, so other visitors share the world in real time.</li>
+</ul>
+<p><strong>User experience</strong></p>
+<ul>
+<li>Observed: the HTML ships an empty <code>&lt;body&gt;</code> and a single JS module. <strong>No text exists in the DOM</strong> (0 characters, 0 headings), so screen readers and search engines get nothing.</li>
+<li>Observed: it ran on mobile emulation, with the planet rendering at 390 px.</li>
+<li>Source: Awwwards Usability 7.46 is its lowest sub-score.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>A stylised, low-poly or toon look scales across devices better than photorealism, and reads as more &quot;designed.&quot;</li>
+<li>Small worlds beat big ones: a planet you can see whole orients people instantly.</li>
+<li>If you build a canvas-only experience, ship a text layer (title, instructions, about) in HTML alongside it.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> abeto (United States, per its Awwwards profile). Awwwards SOTD 10 Nov 2025 (7.92). <strong>Developer Site of the Year 2025.</strong> Stack per Awwwards: Three.js, WebGL, WebSockets. Released Sep 2025 (from research summary; unverified).</p>
+<hr>
+<h3 id="3-igloo-inc-igloo-inc">3. Igloo Inc — <a target="_blank" rel="noopener" href="https://www.igloo.inc">igloo.inc</a></h3>
+<p><img src="images/03-igloo-desktop.jpg" alt="Igloo Inc site-provided image">
+<em>Site-provided image (Open Graph). My capture showed only the loader on grey: a text-glyph progress bar <code>-=+=----==</code>.</em></p>
+<p><strong>Purpose &amp; industry:</strong> Corporate site for Igloo Inc., a consumer-crypto company (meta description: &quot;create the largest onchain community&quot;). Its link to the Pudgy Penguins brand is widely reported but not verified here. Web3 and venture.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Metaphor (observed + source):</strong> The whole brand world is ice. A single igloo in a snowfield, with frosted materials and a cold blue-grey palette.</li>
+<li><strong>Typography (observed, via preview):</strong> Ultra-rounded geometric display type (&quot;IGLOO&quot;) against small monospace body copy, which gives a &quot;terminal&quot; crypto voice.</li>
+<li><strong>Loader (observed):</strong> An ASCII-style progress bar. It&#39;s on-brand, low-cost, and more characterful than a spinner.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>HTML is just a <code>&lt;title&gt;</code>, meta tags and one script. The <code>&lt;body&gt;</code> is empty: no headings, no links, no text in the DOM even after 35 seconds.</li>
+<li>≥15 MB transferred within the first 35 seconds on desktop. That&#39;s significant on mobile data.</li>
+<li>I couldn&#39;t assess navigation because the scene never rendered without a GPU.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>One strong physical metaphor (ice, glass, paper) can carry an entire identity.</li>
+<li>Treat the loader as the first scene, not dead time.</li>
+<li><strong>Caution:</strong> award-winning ≠ inclusive. Don&#39;t copy the empty-HTML architecture; render core copy and links as real HTML.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> abeto and Bureaux. Awwwards SOTD 23 Jul 2024 (7.92; Usability 7.50). <strong>Site of the Year 2024</strong> and <strong>Developer Site of the Year 2024</strong>.</p>
+<hr>
+<h3 id="4-lusion-lusion-co">4. Lusion — <a target="_blank" rel="noopener" href="https://lusion.co">lusion.co</a></h3>
+<p><img src="images/04-lusion-desktop.jpg" alt="Lusion desktop">
+<em>Observed capture, mid-transition: tumbling white and blue 3D objects inside a skewed panel; large numeric loader bottom-left.</em></p>
+<p><strong>Purpose &amp; industry:</strong> Portfolio for a 3D and interactive web studio in Bristol, UK (footer). Creative services.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>3D as material, not decoration (observed):</strong> Glossy, toy-like 3D pieces in white and periwinkle tumble through a slanted window. It&#39;s playful physics that says &quot;we build this&quot; without a sentence.</li>
+<li><strong>Loader as typography (observed):</strong> A huge counter (&quot;014…&quot;) set in <em>Aeonik</em>, cropped at the bottom-left of the viewport.</li>
+<li><strong>Copy (observed):</strong> &quot;We create 3D visual storytelling and interactive web experiences that help brands stand out.&quot; The rest is short, confident text with 12 featured projects (Oryzo AI, Devin AI, Porsche: Dream Machine…).</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li><strong>Viewport disables pinch-zoom</strong> (<code>maximum-scale=1, user-scalable=no</code>).</li>
+<li>No <code>&lt;nav&gt;</code> or <code>&lt;main&gt;</code> landmarks, and 5 unnamed controls.</li>
+<li>On mobile emulation only the loader appeared within the capture window, so mobile behaviour is unverified.</li>
+<li>The page has real HTML text (≈2,800 characters, 1 <code>&lt;h1&gt;</code>), so it isn&#39;t canvas-only.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Show capability, then explain it: a 5-second interactive demo outperforms a paragraph of claims.</li>
+<li>Oversized numerals make a loader feel intentional.</li>
+<li>Keep text in HTML even when the hero is all WebGL.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Lusion. Awwwards SOTD 2 Oct 2023 (8.25 overall; Usability 7.95). <strong>Site of the Year 2023</strong> and Developer SOTY 2023. CSSDA Website of the Year 2023 (from a CSSDA page snippet; partially verified). FWA SOTY and Cannes Lions Silver/Bronze 2024: <strong>unverified</strong> (LinkedIn posts only).</p>
+<hr>
+<h3 id="5-immersive-garden-immersive-g-com">5. Immersive Garden — <a target="_blank" rel="noopener" href="https://immersive-g.com">immersive-g.com</a></h3>
+<p><img src="images/05-immersive-desktop.jpg" alt="Immersive Garden desktop">
+<em>Observed capture: the preloader. Logo, one serif line &quot;Innovative digital experiences studio&quot;, and a counter at 97.</em></p>
+<p><strong>Purpose &amp; industry:</strong> Studio portfolio for a Paris agency known for luxury work (Louis Vuitton, Cartier, Dior, Omega, Longines). Creative services, luxury.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Restraint (observed):</strong> Pale grey ground, <em>PSTimes</em> serif paired with Helvetica Neue, generous empty space. The chrome is quiet so the case-study visuals can be loud.</li>
+<li><strong>Client-led storytelling (observed):</strong> The homepage is essentially a list of 18 projects. Each has a one-line story and a category tag (Web Experience / E-Shop / Corporate).</li>
+<li><strong>Sound toggle (observed):</strong> An &quot;Off / On&quot; audio control, opt-in rather than autoplay.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li><strong>Zoom disabled</strong> in the viewport tag.</li>
+<li><strong>All 39 images lack <code>alt</code> attributes</strong> (19/19 on mobile), with 7 unnamed controls and no <code>&lt;main&gt;</code>.</li>
+<li>≥21 MB transferred within ~35 seconds, the heaviest page in this set.</li>
+<li>The capture stayed on the preloader, so scroll behaviour is unverified.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Luxury reads as <em>what you leave out</em>: one serif, one sans, one neutral, lots of space.</li>
+<li>A homepage can simply be &quot;the work, with one sentence each.&quot;</li>
+<li><strong>Counter-lesson:</strong> this is the clearest example here of beautiful-but-heavy. Budget your media.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Immersive Garden, Paris (founded 2014, per its Awwwards profile). Awwwards <strong>Agency of the Year 2025</strong> and <strong>Studio of the Year 2024</strong>. CSSDA Agency of the Year 2024 (research summary). Awards for this specific site version weren&#39;t verified.</p>
+<hr>
+<h3 id="6-locomotive-locomotive-ca">6. Locomotive — <a target="_blank" rel="noopener" href="https://locomotive.ca/en">locomotive.ca</a></h3>
+<p><img src="images/06-locomotive-desktop.jpg" alt="Locomotive desktop">
+<em>Observed captures (desktop and mobile): full-bleed video with a serif-and-mono headline.</em> <img src="images/06-locomotive-mobile.jpg" alt="Locomotive mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> Portfolio for a Montréal &quot;digital-first design agency.&quot; Creative services.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Typography (observed):</strong> A condensed editorial serif (&quot;Digital-first Design Agency✳&quot;) in warm copper over cool blue video. Brand fonts in the DOM: <em>LocomotiveNew</em> and <em>Helvetica Now Display</em>.</li>
+<li><strong>Brand system (observed):</strong> A small &quot;OPS | DES | DEV&quot; grid logo-mark and an asterisk motif. The social image repeats &quot;Design &amp; Code are only Tools of Expression&quot; as stuttering, cascading type.</li>
+<li><strong>Projected-light video (observed):</strong> Logos are projected onto people, a tactile, physical take on a digital brand.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Navigation is a single line: &quot;Work, Agency, Careers, Store&quot; plus &quot;Let&#39;s talk.&quot; Very short.</li>
+<li><strong>Reduced-motion CSS is present</strong>, as are <code>&lt;main&gt;</code> and three <code>&lt;nav&gt;</code> landmarks.</li>
+<li><strong>Mobile concern:</strong> the copper headline sits over busy video with large type behind it, and legibility drops noticeably at 390 px.</li>
+<li>WebFetch was blocked (HTTP 403), so I relied on rendered captures.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>A warm accent over a cool image is an instant, ownable contrast.</li>
+<li>Write navigation as a sentence (&quot;Work, Agency, Careers, Store&quot;).</li>
+<li>Check text-over-video at mobile widths; add a scrim or move text off the video when it gets busy.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Locomotive, Montréal. Awwwards <strong>Agency of the Year 2024</strong> (and 2023, per research summary). Its profile lists 92 SOTDs. Awards for this specific site build weren&#39;t verified.</p>
+<hr>
+<h3 id="7-scout-motors-scoutmotors-com">7. Scout Motors — <a target="_blank" rel="noopener" href="https://www.scoutmotors.com">scoutmotors.com</a></h3>
+<p><img src="images/07-scout-desktop.jpg" alt="Scout Motors desktop">
+<em>Observed captures: desktop and mobile.</em> <img src="images/07-scout-mobile.jpg" alt="Scout Motors mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> Launch and reservation site for the revived Scout SUV and truck brand (Volkswagen Group). Automotive and e-commerce.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Cinematic heritage (observed):</strong> A full-bleed dusk video of the Traveler and Terra on grassland. The hero runs about two viewports before the first headline, &quot;Scouts always come back.&quot;</li>
+<li><strong>Navigation as an object (observed):</strong> A floating, segmented white nav bar with a small red &quot;+&quot; joint. It&#39;s industrial, like a dashboard trim piece.</li>
+<li><strong>Story structure (observed):</strong> Present (reserve) → past (1961 International Harvester) → &quot;An icon from day one&quot; numbered 01–12 → reveal event → the duo → manufacturing (Detroit, South Carolina).</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Honest disclosures sit right under the hero: &quot;Entry-model pricing expected to start under $60,000. Initial production targeted for 2027, subject to change.&quot;</li>
+<li>The cookie dialog gives <strong>equal-weight &quot;Accept All&quot; and &quot;Reject All&quot; buttons</strong>, which is good practice. But on mobile the dialog covers most of the hero.</li>
+<li>Built with Astro (asset paths). Reduced-motion CSS present; <code>&lt;main&gt;</code> and two <code>&lt;nav&gt;</code> landmarks.</li>
+<li>17 unnamed controls (icon buttons without accessible names).</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Heritage brands can tell past and future in one scroll: lead with the new product, then earn it with history.</li>
+<li>Put legal and pricing caveats where the claim is made, not in a footer.</li>
+<li>Equal-weight consent buttons build trust, but size the banner so it doesn&#39;t bury your hero on mobile.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Locomotive with Scout&#39;s in-house team. Awwwards SOTD 16 Jan 2025 (7.60; Usability 7.27). <strong>E-commerce Site of the Year 2025.</strong> Webby Honoree and Idéa 2025 Silver were in the research summary; I didn&#39;t recheck them.</p>
+<hr>
+<h3 id="8-bruno-simon-bruno-simon-com">8. Bruno Simon — <a target="_blank" rel="noopener" href="https://bruno-simon.com">bruno-simon.com</a></h3>
+<p><img src="images/08-bruno-desktop.jpg" alt="Bruno Simon site-provided image">
+<em>Site-provided image. My capture showed the loading ring on a purple grid floor; the world didn&#39;t finish loading under software WebGL.</em></p>
+<p><strong>Purpose &amp; industry:</strong> The portfolio of a French creative developer and Three.js teacher, built as a drivable game world. Developer portfolio and education.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>The portfolio is a game (source + observed text):</strong> Drive a red off-roader through a dusk landscape. Projects, achievements, a time-trial circuit and visitor &quot;whispers&quot; (30-character messages) are places in the world.</li>
+<li><strong>Influence:</strong> The 2019 version went viral and became a reference point for &quot;playful portfolios.&quot; The late-2025 rebuild keeps the concept and moves to WebGPU with a WebGL fallback (Three.js TSL).</li>
+<li><strong>Generosity (observed):</strong> The page credits its stack and links the <strong>MIT-licensed source code</strong>, Blender files and CC0 music.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Excellent controls documentation for <strong>keyboard, touch and gamepad</strong>, plus &quot;I&#39;m stuck!&quot; respawn, a quality toggle and a renderer switch.</li>
+<li>When the score server was offline, the UI said so plainly: &quot;Server currently offline. Scores can&#39;t be saved.&quot; That&#39;s graceful degradation.</li>
+<li>No <code>&lt;h1&gt;</code>, 41 of 44 images without <code>alt</code>, 14 unnamed controls, ≥7 MB transferred. No non-3D content path.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Give users an escape hatch (&quot;I&#39;m stuck!&quot;) in any non-standard interface.</li>
+<li>Document every input method, including touch and gamepad.</li>
+<li>Open-sourcing your build is a design decision: it turns a portfolio into a teaching tool.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Bruno Simon, Paris. 2019 version: Awwwards SOTD 11 Nov 2019 (8.04) and <strong>Site of the Month Nov 2019</strong>; CSSDA Website of the Year (research summary). 2025 version: Awwwards SOTD 21 Jan 2026 (8.11; Usability 7.83), Portfolio Honors Dec 2025, <strong>Site of the Month Jan 2026</strong>.</p>
+<hr>
+<h3 id="9-basement-studio-basement-studio">9. basement.studio — <a target="_blank" rel="noopener" href="https://basement.studio">basement.studio</a></h3>
+<p><img src="images/09-basement-desktop.jpg" alt="basement.studio desktop">
+<em>Observed captures: desktop and mobile.</em> <img src="images/09-basement-mobile.jpg" alt="basement.studio mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> Studio site for an Argentina-based design and engineering studio working mainly with Bay Area tech companies (Vercel, Linear, Cursor, MrBeast). Creative services.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Wireframe 3D (observed):</strong> The hero is a white-line wireframe of the studio&#39;s own space (stairs, mezzanine, sign). It&#39;s 3D, but drawn like an architectural sketch, so it stays monochrome and on-brand.</li>
+<li><strong>HUMAN / MACHINE toggle (observed):</strong> A pill at the bottom of the viewport. &quot;Machine&quot; links to <code>/ai/home</code>, which their <code>llms.txt</code> describes as a &quot;plain-HTML mirror of the site for agents; every content page has a twin at /ai/{path}.&quot;</li>
+<li><strong>Live details (observed):</strong> &quot;● Online (7)&quot; presence indicator; superscript counts in the nav (Showcase 26, Blog 29). Typeface is <em>Geist</em>, which the studio co-created with Vercel (per its own site).</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li><code>&lt;main&gt;</code> and <code>&lt;nav&gt;</code> present; reduced-motion CSS present.</li>
+<li>≥16 MB transferred during the capture window, which is heavy.</li>
+<li><strong>Mobile bug:</strong> the HUMAN/MACHINE pill overlaps the large headline text at 390 px.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li><strong>Ship a plain-HTML twin of an immersive site.</strong> It serves AI agents, but the same idea serves low-power devices, screen-reader users and slow connections.</li>
+<li>Line-art 3D is a cheaper, more distinctive alternative to photoreal rendering.</li>
+<li>Small live numbers (online count, post counts) make a static site feel inhabited.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> basement.studio, Mar del Plata, Argentina. Current site: Awwwards SOTD 25 Apr 2025 (7.42; Usability 7.13) plus Developer Award (research summary). Earlier versions: SOTD Jun 2022 and HM Jan 2020.</p>
+<hr>
+<h3 id="10-garden-eight-garden-eight-com">10. Garden Eight — <a target="_blank" rel="noopener" href="https://garden-eight.com">garden-eight.com</a></h3>
+<p><img src="images/10-garden8-desktop.jpg" alt="Garden Eight site-provided image">
+<em>Site-provided image: the katakana logotype ガーデンエイト over a soft 3D form. My capture rendered only a grey field.</em></p>
+<p><strong>Purpose &amp; industry:</strong> Studio site for a Tokyo digital design studio. Creative services.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Bilingual identity (observed):</strong> English site with a JA switch. The logotype is hand-set katakana, a strong local signature in a global genre.</li>
+<li><strong>Humble voice (observed):</strong> &quot;Our goal has always been to make a great website in a playful, yet humble way.&quot; The page holds only ~460 characters of text, so the copy is sparse and personal.</li>
+<li><strong>Small UX touch (observed):</strong> The email address has &quot;Copy to clipboard / Copied&quot; feedback.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li><strong>Zoom disabled.</strong> <code>&lt;main&gt;</code>, <code>&lt;nav&gt;</code> and one <code>&lt;h1&gt;</code> present.</li>
+<li>I couldn&#39;t assess the visual experience: the WebGL scene didn&#39;t render.</li>
+<li>Unverified: whether the live site is the same version that won the 2022 SOTD.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Let your local script be your logo; it differentiates instantly.</li>
+<li>Click-to-copy beats <code>mailto:</code> for many users. Confirm it with a visible state change.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Garden Eight, Tokyo. Awwwards SOTD 10 Mar 2022 (7.46; Usability 7.01, the lowest usability score in this set) and SOTD 8 Aug 2017.</p>
+<hr>
+<h3 id="editorial-brand-storytelling">Editorial, brand &amp; storytelling</h3>
+<hr>
+<h3 id="11-tengile-malamala-collection-tengilemalamala-com">11. Tengile MalaMala Collection — <a target="_blank" rel="noopener" href="https://tengilemalamala.com">tengilemalamala.com</a></h3>
+<p><img src="images/11-tengile-desktop.jpg" alt="Tengile MalaMala desktop">
+<em>Observed captures: desktop and mobile.</em> <img src="images/11-tengile-mobile.jpg" alt="Tengile MalaMala mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> Safari lodges and camps on the Sand River, Greater Kruger / Sabi Sand, South Africa, with a conservation and community-ownership story. Hospitality, travel, conservation.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Photography-led (observed):</strong> A full-bleed aerial film of the river. The thin, wide-tracked serif headline &quot;UNMATCHED ABUNDANCE&quot; (<em>PP Fragment</em>, with <em>Inter</em> for body) is staggered across two lines like a title card.</li>
+<li><strong>Restrained UI (observed):</strong> Only &quot;ENQUIRE&quot; (left), the logotype (centre) and &quot;MENU&quot; (right), with small paired buttons (&quot;Explore Collection →&quot;).</li>
+<li><strong>Story with substance (observed):</strong> The page traces the land&#39;s protection back to 1927 and explains the Shangaan principle <em>Ntumbuluko</em> (&quot;deep harmony with the land&quot;). It states community co-ownership and describes itself as &quot;one of South Africa&#39;s few black-empowered eco-tourism enterprises.&quot;</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li><strong>The most accessible awarded site in this set:</strong> skip link, <code>&lt;main&gt;</code>, four <code>&lt;nav&gt;</code> landmarks, 21 headings, and <code>alt</code> on every image.</li>
+<li>Mobile: the headline re-flows cleanly at 390 px.</li>
+<li>Equal-weight &quot;Decline All / Accept All&quot; cookie choice.</li>
+<li>No reduced-motion CSS detected despite the hero video.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>A luxury feel doesn&#39;t require heavy WebGL: great footage, one fine serif and silence do the work.</li>
+<li>Pair aspirational imagery with concrete facts (dates, room counts, ownership) to earn trust.</li>
+<li>Award-level craft and solid accessibility basics can coexist; this site proves it.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> DashDigital (Cape Town, South Africa) with Ingamana. Awwwards SOTD 3 Oct 2026 (7.22; Usability 7.26). Stack per Awwwards: React, Sanity, AWS.</p>
+<hr>
+<h3 id="12-colonia-zacamil-coloniazacamil-com">12. Colonia Zacamil — <a target="_blank" rel="noopener" href="https://coloniazacamil.com">coloniazacamil.com</a></h3>
+<p><img src="images/12-zacamil-desktop.jpg" alt="Colonia Zacamil desktop">
+<em>Observed captures: desktop and mobile.</em> <img src="images/12-zacamil-mobile.jpg" alt="Colonia Zacamil mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> An interactive map of a public-art and regenerative placemaking project in Colonia Zacamil, Mejicanos, El Salvador (location per CMS Foundation and secondary sources). Curated by the Custom Made Stories Foundation (&quot;[powered by CMS]&quot; on page). Civic, cultural, non-profit.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Typographic hero (observed):</strong> &quot;FLY TO ZACAMIL&quot; in ultra-condensed black capitals, with an aerial strip of the housing blocks set <em>inside</em> the line of type, like a word. <em>Roboto Mono</em> labels add a field-notes tone.</li>
+<li><strong>Map as table of contents (observed):</strong> About 26 named mural and story locations (&quot;Paz y Pachamama&quot;, &quot;Cadejo&quot;, &quot;Volcano&quot;, &quot;The Bus&quot;…) become pins on a 3D model of the neighbourhood.</li>
+<li><strong>Before/after switch (unverified):</strong> A &quot;past / present&quot; toggle that strips murals off the buildings, described by a design-news article. I didn&#39;t confirm it myself.</li>
+<li><strong>Bilingual (observed):</strong> EN/ES switch, with Spanish titles kept in the English version.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Clear gesture instructions for every input: &quot;swipe to explore / click and drag / pinch to zoom / scroll to zoom / click on the pins.&quot;</li>
+<li>An audio prompt (&quot;Activate audio for the full experience&quot;) rather than autoplay.</li>
+<li><strong>Zoom disabled</strong>; no headings or landmarks; ≥5.7 MB transferred.</li>
+<li>Mobile: the hero type re-stacks into three bold lines and works well.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Put an image inside a headline line to merge word and place.</li>
+<li>For spatial stories, a map <em>is</em> the navigation.</li>
+<li>Write gesture hints for each input type, not just &quot;drag.&quot;</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Adoratorio Studio with 60fps. Awwwards SOTD 1 Oct 2026 (7.58; Usability 7.42); nominated for Business &amp; Services Honors. Stack per Awwwards: Three.js, Vue.js, WebGL. Adoratorio&#39;s home country (Italy) is <strong>unverified</strong>.</p>
+<hr>
+<h3 id="13-the-pudding-pudding-cool">13. The Pudding — <a target="_blank" rel="noopener" href="https://pudding.cool">pudding.cool</a></h3>
+<p><img src="images/13-pudding-desktop.jpg" alt="The Pudding desktop">
+<em>Observed captures: desktop and mobile.</em> <img src="images/13-pudding-mobile.jpg" alt="The Pudding mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> A digital publication of visual, data-driven essays (&quot;life after death?&quot;, &quot;mowing experiment&quot;, &quot;english vocab lists&quot;). Journalism and data visualisation.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Personality (observed):</strong> A retro script logo, sticker-style nav icons (OUR FAVES, POPULAR, UPDATING, YOUR INPUT, VIDEO, AUDIO), and condensed bold headlines (<em>Gooper SemiCondensed</em>).</li>
+<li><strong>Issue numbering (observed):</strong> Each story is numbered (#225, Oct 2026) like a magazine. The archive feels collectible and cumulative.</li>
+<li><strong>Card thumbnails are mini-previews (observed):</strong> Each tile shows a real frame of the interactive on a saturated colour block.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Search box (&quot;Find a story…&quot;) and filters in the first viewport. On mobile they collapse to search plus an &quot;All&quot; dropdown.</li>
+<li>Skip link, <code>&lt;main&gt;</code>, <code>&lt;nav&gt;</code>, reduced-motion CSS. No <code>&lt;h1&gt;</code> on the index page.</li>
+<li>Built with Svelte (HTML references).</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Number your content; it signals output and invites binge-reading.</li>
+<li>Make thumbnails honest previews of the experience, not stock imagery.</li>
+<li>Category filters named by <em>behaviour</em> (&quot;Updating&quot;, &quot;Your input&quot;) beat topic tags for interactive content.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> The Pudding (US; founded by Matt Daniels per research summary). Webby Honoree 2019. Information is Beautiful Awards recognition 2024 (research summary).</p>
+<hr>
+<h3 id="14-bartosz-ciechanowski-ciechanow-ski">14. Bartosz Ciechanowski — <a target="_blank" rel="noopener" href="https://ciechanow.ski/mechanical-watch/">ciechanow.ski</a></h3>
+<p><img src="images/14-ciechanowski-desktop.jpg" alt="Ciechanowski desktop">
+<em>Observed captures (desktop and mobile): &quot;Mechanical Watch&quot; (4 May 2022).</em> <img src="images/14-ciechanowski-mobile.jpg" alt="Ciechanowski mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> Long-form interactive explainers (mechanical watches, GPS, cameras, airfoils) by a solo author. Education and science communication.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Interactivity in service of understanding (observed):</strong> Text and dozens of inline 3D diagrams alternate. Readers drag to rotate, scrub sliders and toggle states. Each figure answers exactly the question the previous paragraph raised.</li>
+<li><strong>Radical plainness (observed):</strong> A blue header bar, a ~650 px reading column, <em>Inter</em>, a date and title. No hero, no ads, no pop-ups.</li>
+<li><strong>Scale (observed):</strong> ~46,000 characters of text on one page; 14 section <code>&lt;h1&gt;</code>s.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Superb readability on desktop and mobile; the column becomes full-width with comfortable line length.</li>
+<li>The article tells readers how to use the first figure (&quot;You can drag the device around… use the slider to peek inside&quot;).</li>
+<li>13 images without <code>alt</code>, no landmarks, 13 unnamed controls, and no reduced-motion CSS (the author offers a global pause instead, per page text).</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Interactivity is best when it&#39;s <em>explanatory</em>: one concept per figure, placed right after the sentence that needs it.</li>
+<li>A boring frame lets extraordinary content shine.</li>
+<li>Teach the interaction once, early, in plain words.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Bartosz Ciechanowski (Polish, per secondary source). <strong>No awards verified</strong>; its influence is widely cited informally.</p>
+<hr>
+<h3 id="15-ableton-learning-synths-learningsynths-ableton-com">15. Ableton Learning Synths — <a target="_blank" rel="noopener" href="https://learningsynths.ableton.com">learningsynths.ableton.com</a></h3>
+<p><img src="images/15-ableton-desktop.jpg" alt="Ableton Learning Synths desktop">
+<em>Observed captures, desktop and mobile (cookie banner visible).</em> <img src="images/15-ableton-mobile.jpg" alt="Ableton Learning Synths mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> A free, interactive course on how synthesizers work, from the Berlin music-software company. Education and music technology.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Learn by doing in the first viewport (observed):</strong> &quot;Get started making sounds. Drag in the box below to play a synthesizer.&quot; The very first interaction is the lesson.</li>
+<li><strong>Visual language (observed + site image):</strong> Big geometric sans (<em>Ableton Sans</em>), navy text on white, coral highlights, and a set of colourful waveform shapes (triangle, saw, square, sine) as illustration.</li>
+<li><strong>Mobile empathy (observed):</strong> On iPhone emulation it shows &quot;Unmute your device before continuing&quot; with a drawing of the phone&#39;s mute switch. A real-world failure mode, designed for.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>A &quot;Chapters&quot; side rail on desktop; a hamburger on mobile.</li>
+<li><strong>Zoom disabled.</strong></li>
+<li>WebFetch (no JS) got only &quot;Your browser does not support this site,&quot; so there&#39;s no non-JS fallback.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Make the first interaction the core value. No intro, no marketing.</li>
+<li>Anticipate the physical context (mute switch, headphones, volume) and design a friendly preflight screen.</li>
+<li>Use simple geometric illustration that literally depicts the concept (waveforms).</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Ableton, Berlin. Sibling site Learning Music: Awwwards Honorable Mention 29 May 2017. Learning Synths launched 2019, team led by Dennis DeSantis, sound engine built with Cycling &#39;74 RNBO (research summary; unverified).</p>
+<hr>
+<h3 id="16-teenage-engineering-teenage-engineering">16. Teenage Engineering — <a target="_blank" rel="noopener" href="https://teenage.engineering">teenage.engineering</a></h3>
+<p><img src="images/16-teenage-desktop.jpg" alt="Teenage Engineering desktop">
+<em>Observed captures: desktop and mobile.</em> <img src="images/16-teenage-mobile.jpg" alt="Teenage Engineering mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> Brand and store for the Stockholm maker of synthesizers and design objects (OP-1, Pocket Operators). Consumer electronics and retail.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Monochrome industrial (observed):</strong> Black-and-white night photograph of the new New York store, with a neon sign reading &quot;TEENAGE ENGINEERING™ DEPARTMENT STORE 216 LAFAYETTE ST NEW YORK.&quot;</li>
+<li><strong>Navigation as product labelling (observed):</strong> A strip of thin line pictograms, each with a lowercase word and small sub-links (products: instruments · audio · designs; store; latest; finder). Alongside sits a dense block of tiny Japanese text, like the spec plate on one of their devices.</li>
+<li><strong>Custom type (observed):</strong> The DOM uses the in-house font <em>te-20</em>; the copy is all lowercase.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Very light page. Reduced-motion CSS present.</li>
+<li><strong>Zoom disabled</strong>; no <code>&lt;h1&gt;</code>.</li>
+<li>Mobile reduces to a cart counter, a kebab menu, the photo and &quot;NOW OPEN! WED–SUN 11AM–7PM.&quot; It&#39;s clear, if spare.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Let your website look like your product (labels, pictograms, spec plates).</li>
+<li>One monochrome photograph plus precise micro-typography can out-brand any animation.</li>
+<li>Sub-links under top-level nav items reduce clicks without mega-menus.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Teenage Engineering (Stockholm, from the site footer). <strong>Site designer and awards unverified.</strong></p>
+<hr>
+<h3 id="product-utility">Product &amp; utility</h3>
+<hr>
+<h3 id="17-linear-linear-app">17. Linear — <a target="_blank" rel="noopener" href="https://linear.app">linear.app</a></h3>
+<p><img src="images/17-linear-desktop.jpg" alt="Linear desktop">
+<em>Observed captures: desktop and mobile.</em> <img src="images/17-linear-mobile.jpg" alt="Linear mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> Marketing site for a product-development and issue-tracking tool, now positioned &quot;for teams and agents.&quot; B2B SaaS.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>The product is the hero (observed):</strong> Under &quot;The product development system for teams and agents&quot; sits a pixel-accurate rendering of the actual app: sidebar, issue, activity feed and an AI agent panel.</li>
+<li><strong>Precision dark aesthetic (observed):</strong> Near-black background, grey secondary text, a white pill CTA. <em>Inter Variable</em> for UI and <em>Berkeley Mono</em> for technical labels, plus &quot;FIG 0.1&quot;-style captions under isometric line drawings, like a technical manual.</li>
+<li><strong>Two-tone headlines (observed):</strong> A white statement followed by a grey continuation (&quot;A new species of product tool. Purpose-built for…&quot;). It&#39;s a common SaaS pattern now; Linear&#39;s execution is very tight.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Skip link, <code>&lt;main&gt;</code>, two <code>&lt;nav&gt;</code> landmarks, reduced-motion CSS. About 9,000 characters of real content.</li>
+<li>Excellent mobile layout: the headline scales and the product UI crops gracefully.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Show your actual interface, at real fidelity, above the fold.</li>
+<li>Use a monospace &quot;spec&quot; voice for captions and labels to signal engineering rigour.</li>
+<li>Two-tone headline/sub-head pairs let one sentence do the work of two.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Linear (in-house). <strong>No awards verified.</strong> Linear has published design write-ups on its 2024 UI redesign (research summary).</p>
+<hr>
+<h3 id="18-stripe-stripe-com">18. Stripe — <a target="_blank" rel="noopener" href="https://stripe.com">stripe.com</a></h3>
+<p><img src="images/18-stripe-desktop.jpg" alt="Stripe desktop">
+<em>Observed captures: desktop and mobile.</em> <img src="images/18-stripe-mobile.jpg" alt="Stripe mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> Homepage for the payments and financial infrastructure company. Fintech, B2B.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>The gradient ribbon (observed):</strong> A flowing orange-pink-violet band sweeps across the hero. It&#39;s the most-imitated SaaS visual of the last decade, and still distinctive here because it&#39;s paired with very sober typography (<em>Söhne Variable</em>).</li>
+<li><strong>Live data as headline (observed):</strong> &quot;Global GDP running on Stripe: 1.73289591%&quot;, a ticking figure that makes an abstract claim concrete.</li>
+<li><strong>Hierarchy (observed):</strong> The headline sets its first clause in dark ink and the continuation in slate blue. Primary and secondary CTAs (&quot;Get started&quot;, &quot;Sign up with Google&quot;) are clearly ranked.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>Mega-menu navigation (Products, Solutions, Developers, Resources, Pricing). The mobile hamburger keeps both CTAs full-width.</li>
+<li>A sales-chat pop-up (&quot;11 sales reps available&quot;) appears over content on desktop.</li>
+<li>Two <code>&lt;h1&gt;</code> elements; no reduced-motion CSS detected despite the animated hero.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>One signature visual plus disciplined type can define a brand.</li>
+<li>Turn a big claim into a live, specific number.</li>
+<li>Rank your CTAs visually: one filled, one outlined.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Stripe (in-house). Stripe.com is listed as an Awwwards nominee only. The separate Stripe Dot Dev site won Awwwards SOTD 9 Oct 2024 (7.43).</p>
+<hr>
+<h3 id="19-gov-uk-gov-uk">19. GOV.UK — <a target="_blank" rel="noopener" href="https://www.gov.uk">gov.uk</a></h3>
+<p><img src="images/19-govuk-desktop.jpg" alt="GOV.UK desktop">
+<em>Observed captures, desktop and mobile (cookie banner shown on first visit).</em> <img src="images/19-govuk-mobile.jpg" alt="GOV.UK mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> The single domain for UK government services and information. Public sector. <strong>Included deliberately as the counterweight to visual complexity.</strong></p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Utility as identity (observed):</strong> One typeface (<em>GDS Transport</em>), one blue, one black, and a giant plain-English headline (&quot;The best place to find government services and information&quot;), with search as the primary action.</li>
+<li><strong>Influence (source):</strong> Its design principles and open-source design system (GOV.UK Frontend) have shaped public-sector design worldwide.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>The lightest page measured in the set (≥0.2 MB). Skip link, landmarks, reduced-motion CSS.</li>
+<li><strong>Cookie banner with equal &quot;Accept additional cookies&quot; / &quot;Reject additional cookies&quot; buttons</strong>, plus &quot;View cookies.&quot;</li>
+<li>Mobile is effectively identical in hierarchy, just narrower.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>Write the headline as the user&#39;s goal, not your brand promise.</li>
+<li>Search-first is a design style. For content-heavy sites it often beats navigation menus.</li>
+<li>Consistency (one font, one blue, one button style) is a brand.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Government Digital Service. Launched 2012. <strong>Design Museum Design of the Year 2013</strong> (overall and digital category).</p>
+<hr>
+<h3 id="20-poolsuite-poolsuite-net">20. Poolsuite — <a target="_blank" rel="noopener" href="https://poolsuite.net">poolsuite.net</a></h3>
+<p><img src="images/20-poolsuite-desktop.jpg" alt="Poolsuite desktop">
+<em>Observed captures: desktop and mobile.</em> <img src="images/20-poolsuite-mobile.jpg" alt="Poolsuite mobile"></p>
+<p><strong>Purpose &amp; industry:</strong> A summer-themed internet radio and lifestyle brand (formerly Poolside.FM). Music, media, membership.</p>
+<p><strong>What makes it distinctive</strong></p>
+<ul>
+<li><strong>Retro-OS metaphor (observed):</strong> A late-&#39;90s Mac-style desktop in pale pink. A windowed player shows grainy &quot;Pool TV&quot; car-commercial footage, a &quot;Poolsuite: ON AIR&quot; channel and transport buttons. A dock holds Player, Newsroom, Mixtapes, Members, Events, Instagram, Vacation, Guestbook, Apps.</li>
+<li><strong>Playful detail (observed):</strong> The menu-bar clock reads today&#39;s date in <strong>1997</strong> (&quot;THU 15 OCT 1997&quot;). Fonts include a bitmap-style face (<em>Ishmeria</em>).</li>
+<li><strong>Commitment to the bit:</strong> Every feature is an &quot;app&quot; in the fake OS, so the metaphor is the information architecture.</li>
+</ul>
+<p><strong>User experience (observed)</strong></p>
+<ul>
+<li>On desktop the metaphor is instantly understood.</li>
+<li><strong>Mobile bug:</strong> the player window is clipped off the right edge at 390 px (no page-level overflow was flagged, so it&#39;s cropped inside a container).</li>
+<li>73 of 133 images lack <code>alt</code>, 11 unnamed controls, no <code>&lt;h1&gt;</code>, no reduced-motion CSS.</li>
+</ul>
+<p><strong>Design lessons</strong></p>
+<ul>
+<li>A strong nostalgic metaphor can double as your IA (apps = sections).</li>
+<li>Tiny jokes (the 1997 clock) create affection and shareability at zero cost.</li>
+<li>Retro desktop metaphors need a genuine mobile re-think, not just scaling.</li>
+</ul>
+<p><strong>Credits &amp; awards (source):</strong> Founded by Marty Bell; standalone site since 2019 (research summary). Product Hunt Golden Kitty 2020 for the iPhone app and Launch of the Day 2021. <strong>No web-design awards verified; creator&#39;s country unverified.</strong></p>
+<hr>
+<h2 id="3-top-five-selections">3. Top five selections</h2>
+<p>Criteria: originality <strong>and</strong> how well the design serves its purpose, weighted against observed usability and accessibility. Awards were a tiebreaker, not a driver.</p>
+<table>
+<thead>
+<tr>
+<th>Rank</th>
+<th>Site</th>
+<th>Why it makes the top five</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>1</strong></td>
+<td><strong>Bartosz Ciechanowski</strong></td>
+<td>The purest example of interaction serving understanding. Every figure exists because a sentence needed it, inside a frame so plain it disappears. No award needed: it changes what readers <em>know</em>. Accessibility of the figures is the one gap.</td>
+</tr>
+<tr>
+<td><strong>2</strong></td>
+<td><strong>Tengile MalaMala Collection</strong></td>
+<td>Shows award-level beauty <strong>and</strong> the strongest accessibility basics among awarded sites (skip link, landmarks, alt text, equal cookie choice). It proves you don&#39;t need 15 MB of WebGL to feel luxurious. Footage, a fine serif and silence do it.</td>
+</tr>
+<tr>
+<td><strong>3</strong></td>
+<td><strong>Lando Norris</strong></td>
+<td>The year&#39;s top award winner, and it earns it on fundamentals: a memorable two-typeface wordmark, a single accent colour reserved for commerce, a live &quot;next race&quot; module, and a clear person → performance → store narrative. Its alt-text coverage is complete.</td>
+</tr>
+<tr>
+<td><strong>4</strong></td>
+<td><strong>basement.studio</strong></td>
+<td>Combines a distinctive wireframe aesthetic with the single most forward-looking idea in the collection: a <strong>HUMAN / MACHINE</strong> switch to a plain-HTML twin of every page. It&#39;s heavy, and the toggle overlaps text on mobile, but the concept is worth stealing.</td>
+</tr>
+<tr>
+<td><strong>5</strong></td>
+<td><strong>Ableton Learning Synths</strong></td>
+<td>Makes the first interaction the lesson, and designs for the physical world (&quot;unmute your device&quot;). A model for any product that needs to teach.</td>
+</tr>
+</tbody></table>
+<p><strong>Honourable mentions:</strong> <strong>Linear</strong> (best product-as-hero), <strong>Colonia Zacamil</strong> (map-as-navigation and type-as-image, for a civic cause), <strong>GOV.UK</strong> (the benchmark for clarity), and <strong>Messenger</strong> (the most delightful pure experiment, held back by having no text layer at all).</p>
+<p><strong>Why not Igloo, Immersive Garden or Lusion in the top five?</strong> They are visually extraordinary and heavily awarded. But in observed terms they ship empty or near-empty HTML (Igloo), lack image alt text (Immersive Garden), disable zoom (Lusion, Immersive Garden), and are among the heaviest pages tested. Visual complexity is not the same as good design.</p>
+<hr>
+<h2 id="4-the-strongest-design-ideas-across-the-collection">4. The strongest design ideas across the collection</h2>
+<ol>
+<li><strong>Make the first interaction the value.</strong> Ableton&#39;s playable box, Linear&#39;s real UI, Ciechanowski&#39;s draggable watch. Nobody waits for a pitch.</li>
+<li><strong>One accent, used once.</strong> Lando&#39;s lime STORE button, Scout&#39;s red &quot;+&quot; joint, Locomotive&#39;s copper headline. Scarcity makes colour mean something.</li>
+<li><strong>Two typefaces with opposite personalities.</strong> Serif + grotesk (Lando, Locomotive, Immersive Garden), sans + mono (Linear, Zacamil, Igloo). The contrast does the branding.</li>
+<li><strong>Live, specific data as a headline.</strong> Stripe&#39;s GDP counter, Lando&#39;s next race, basement&#39;s &quot;Online (7),&quot; Teenage Engineering&#39;s store hours.</li>
+<li><strong>A single strong metaphor that doubles as navigation.</strong> Poolsuite&#39;s desktop (apps = sections), Zacamil&#39;s map (pins = stories), Bruno&#39;s world (places = projects), Messenger&#39;s planet.</li>
+<li><strong>Stylised over photoreal 3D.</strong> Toon shading (Messenger), wireframe (basement), toy-like plastic (Lusion). More distinctive, more legible, and usually lighter.</li>
+<li><strong>Loaders as the first scene.</strong> Igloo&#39;s ASCII bar, Lusion&#39;s giant counter, Immersive Garden&#39;s serif line with percentage.</li>
+<li><strong>A plain-HTML twin for immersive sites.</strong> basement&#39;s <code>/ai/</code> mirror. Generalise it to a text, low-power or accessible mode.</li>
+<li><strong>Design for the physical context.</strong> Ableton&#39;s mute-switch prompt; Bruno&#39;s keyboard, touch and gamepad docs, plus &quot;I&#39;m stuck!&quot;</li>
+<li><strong>Honesty builds trust.</strong> Scout&#39;s pricing and timing caveats next to the claim; equal-weight cookie choices (Scout, Tengile, GOV.UK); Bruno&#39;s &quot;server offline&quot; message.</li>
+</ol>
+<h3 id="recurring-weaknesses-to-avoid-observed">Recurring weaknesses to avoid (observed)</h3>
+<ul>
+<li><strong>Disabling pinch-zoom</strong> (6 of 20 sites: Lusion, Immersive Garden, Garden Eight, Zacamil, Ableton, Teenage Engineering).</li>
+<li><strong>Missing text alternatives</strong>: Igloo and Messenger render no DOM text at all; Immersive Garden, Bruno Simon and Poolsuite leave most images without <code>alt</code>.</li>
+<li><strong>No reduced-motion handling detected</strong> on 13 of 20 sites, including most of the motion-heavy ones. (Cross-origin stylesheets can&#39;t be inspected, so a few may handle it in ways I couldn&#39;t see.)</li>
+<li><strong>Weight</strong>: several WebGL sites transferred 5–21 MB within the first ~35 seconds.</li>
+<li><strong>Award juries agree, quietly.</strong> For every awarded site with published Awwwards scores, <strong>Usability was the lowest or second-lowest sub-score</strong>, and in most cases the lowest.</li>
+</ul>
+<hr>
+<h2 id="5-things-i-could-not-verify">5. Things I could not verify</h2>
+<ul>
+<li><strong>Real-device rendering and speed</strong> of the heavy WebGL sites (Igloo, Bruno Simon, Garden Eight, Lando&#39;s 3D layer, Immersive Garden&#39;s case-study scenes). My renderer had no GPU.</li>
+<li><strong>Colonia Zacamil&#39;s &quot;past/present&quot; switch</strong> (reported by a design-news article; not observed by me).</li>
+<li><strong>Lusion&#39;s FWA Site of the Year and Cannes Lions 2024 awards</strong> (LinkedIn only). The CSSDA WOTY 2023 is only partially confirmed.</li>
+<li><strong>Scout Motors&#39; Webby and Idéa awards</strong>, The Pudding&#39;s 2024 Information is Beautiful recognition, and Bruno Simon&#39;s 2019 CSSDA WOTY (research summary; not rechecked).</li>
+<li><strong>Countries</strong> for Adoratorio (Italy?), Poolsuite&#39;s creator, and Ciechanowski (Poland, secondary source).</li>
+<li><strong>Whether Garden Eight&#39;s live site</strong> is the same version that won SOTD in 2022.</li>
+<li><strong>Teenage Engineering&#39;s and Linear&#39;s site designers</strong>, and any awards for them.</li>
+<li><strong>Opal Tadpole</strong> (E-commerce of the Year 2024) is no longer accessible and was excluded.</li>
+</ul>
+<hr>
+<h2 id="sources">Sources</h2>
+<p><strong>Award platforms (primary)</strong></p>
+<ul>
+<li>Awwwards Hall of Fame 2025 — <a target="_blank" rel="noopener" href="https://www.awwwards.com/annual-awards/hall-of-fame/2025">https://www.awwwards.com/annual-awards/hall-of-fame/2025</a></li>
+<li>Awwwards Hall of Fame 2024 — <a target="_blank" rel="noopener" href="https://www.awwwards.com/annual-awards/hall-of-fame/2024">https://www.awwwards.com/annual-awards/hall-of-fame/2024</a></li>
+<li>Awwwards Sites of the Year — <a target="_blank" rel="noopener" href="https://www.awwwards.com/websites/sites_of_the_year/">https://www.awwwards.com/websites/sites_of_the_year/</a></li>
+<li>Awwwards Sites of the Day — <a target="_blank" rel="noopener" href="https://www.awwwards.com/websites/sites_of_the_day/">https://www.awwwards.com/websites/sites_of_the_day/</a></li>
+<li>Lando Norris — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/lando-norris">https://www.awwwards.com/sites/lando-norris</a></li>
+<li>Messenger — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/messenger">https://www.awwwards.com/sites/messenger</a></li>
+<li>Igloo Inc — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/igloo-inc">https://www.awwwards.com/sites/igloo-inc</a></li>
+<li>Opal Tadpole — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/opal-tadpole">https://www.awwwards.com/sites/opal-tadpole</a></li>
+<li>Lusion v3 — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/lusion-v3">https://www.awwwards.com/sites/lusion-v3</a></li>
+<li>Scout Motors — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/scout-motors">https://www.awwwards.com/sites/scout-motors</a></li>
+<li>Bruno Simon Portfolio (2019) — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/bruno-simon-portfolio">https://www.awwwards.com/sites/bruno-simon-portfolio</a></li>
+<li>Bruno&#39;s Portfolio (2025) — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/brunos-portfolio">https://www.awwwards.com/sites/brunos-portfolio</a></li>
+<li>Bruno&#39;s Portfolio case study — <a target="_blank" rel="noopener" href="https://www.awwwards.com/brunos-portfolio-case-study.html">https://www.awwwards.com/brunos-portfolio-case-study.html</a></li>
+<li>Bruno Simon SOTM Nov 2019 — <a target="_blank" rel="noopener" href="https://www.awwwards.com/bruno-simon-portfolio-wins-site-of-the-month-november.html">https://www.awwwards.com/bruno-simon-portfolio-wins-site-of-the-month-november.html</a></li>
+<li>Bruno Simon profile — <a target="_blank" rel="noopener" href="https://www.awwwards.com/bruno.simon/submissions">https://www.awwwards.com/bruno.simon/submissions</a></li>
+<li>basement studio (2025) — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/basement-studio-3">https://www.awwwards.com/sites/basement-studio-3</a></li>
+<li>basement studio (2022) — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/basement-studio-1">https://www.awwwards.com/sites/basement-studio-1</a></li>
+<li>basement studio profile — <a target="_blank" rel="noopener" href="https://www.awwwards.com/basementstudio/">https://www.awwwards.com/basementstudio/</a></li>
+<li>Garden Eight (2022) — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/garden-eight">https://www.awwwards.com/sites/garden-eight</a></li>
+<li>Garden Eight (2017) — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/garden-eight-1">https://www.awwwards.com/sites/garden-eight-1</a></li>
+<li>Tengile MalaMala Collection — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/tengile-malamala-collection">https://www.awwwards.com/sites/tengile-malamala-collection</a></li>
+<li>Colonia Zacamil — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/colonia-zacamil">https://www.awwwards.com/sites/colonia-zacamil</a></li>
+<li>Learning Music (Ableton) — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/learning-music-ableton">https://www.awwwards.com/sites/learning-music-ableton</a></li>
+<li>Stripe Dot Dev — <a target="_blank" rel="noopener" href="https://www.awwwards.com/sites/stripe-dot-dev">https://www.awwwards.com/sites/stripe-dot-dev</a></li>
+<li>Agency profiles: <a target="_blank" rel="noopener" href="https://www.awwwards.com/locomotive/">https://www.awwwards.com/locomotive/</a> · <a target="_blank" rel="noopener" href="https://www.awwwards.com/offbrand/">https://www.awwwards.com/offbrand/</a> · <a target="_blank" rel="noopener" href="https://www.awwwards.com/abeto/">https://www.awwwards.com/abeto/</a> · <a target="_blank" rel="noopener" href="https://www.awwwards.com/dashdigital/">https://www.awwwards.com/dashdigital/</a></li>
+<li>CSSDA, Lusion v3 — <a target="_blank" rel="noopener" href="https://www.cssdesignawards.com/sites/lusion-v3/44591/">https://www.cssdesignawards.com/sites/lusion-v3/44591/</a></li>
+<li>Design Museum, Designs of the Year — <a target="_blank" rel="noopener" href="https://designmuseum.org/exhibitions/beazley-designs-of-the-year">https://designmuseum.org/exhibitions/beazley-designs-of-the-year</a></li>
+</ul>
+<p><strong>Creator and project sources</strong></p>
+<ul>
+<li>basement.studio <code>llms.txt</code> — <a target="_blank" rel="noopener" href="https://basement.studio/llms.txt">https://basement.studio/llms.txt</a> (describes the <code>/ai/</code> plain-HTML mirror)</li>
+<li>Bruno Simon source code (MIT) — <a target="_blank" rel="noopener" href="https://github.com/brunosimon/folio-2025">https://github.com/brunosimon/folio-2025</a></li>
+<li>CMS Foundation projects (Zacamil) — <a target="_blank" rel="noopener" href="https://cms.foundation/our-projects">https://cms.foundation/our-projects</a></li>
+<li>Dokle, &quot;Colonia Zacamil puts a past-present switch on a 3D map&quot; (secondary) — <a target="_blank" rel="noopener" href="https://dokle.design/awards/colonia-zacamil-past-present-switch-3d-map">https://dokle.design/awards/colonia-zacamil-past-present-switch-3d-map</a></li>
+</ul>
+<p><strong>Secondary (used only where marked &quot;unverified&quot;)</strong></p>
+<ul>
+<li>Lusion&#39;s Cannes Lions / FWA claims via LinkedIn posts by Lusion and Edan Kwan (2024)</li>
+<li>Opal Tadpole E-commerce of the Year via LinkedIn posts by Claudio Guglieri and Ingamana (2025)</li>
+</ul>
+<p><strong>Firsthand inspection:</strong> All 20 live sites (plus <code>op.al</code>), visited 15 Oct 2026 with headless Chrome, curl and text extraction. Screenshots are in <code>images/</code>.</p>
+</main></body></html>
