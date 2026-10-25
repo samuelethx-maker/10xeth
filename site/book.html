@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Book a session — Kelda harbour sauna</title>
+<meta name="description" content="Choose a shared session or private hire, pick a day and time, and request your place at Kelda." />
+<meta name="theme-color" content="#f3ede2" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%2310272c'/%3E%3Cpath d='M8 21 16 11l8 10z' fill='%23e48d55'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..700,50;1,9..144,300..700,50&family=Work+Sans:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="css/site.css" />
+<link rel="stylesheet" href="css/book.css" />
+<script>document.documentElement.classList.remove("no-js");</script>
+</head>
+<body class="page-book">
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="site-header" data-header>
+  <div class="wrap site-header__inner">
+    <a class="wordmark" href="index.html" aria-label="Kelda, home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#10272c"/><path d="M8 21 16 11l8 10z" fill="#e48d55"/><path d="M6 24h20" stroke="#f3ede2" stroke-width="1.6"/></svg>
+      <span>Kelda</span>
+    </a>
+    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-menu-toggle>
+      <span class="menu-toggle__bars" aria-hidden="true"></span> Menu
+    </button>
+    <nav class="nav" id="site-nav" aria-label="Main" data-nav>
+      <ul>
+        <li><a href="index.html#ritual">The ritual</a></li>
+        <li><a href="index.html#sessions">Sessions</a></li>
+        <li><a href="index.html#first-time">First time</a></li>
+        <li><a href="index.html#visit">Visit</a></li>
+        <li><a href="index.html#faq">FAQ</a></li>
+      </ul>
+      <a class="btn btn--small" href="book.html" aria-current="page">Book a session</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="book">
+  <div class="wrap">
+    <header class="book__intro">
+      <p class="eyebrow">Book</p>
+      <h1>Choose your session.</h1>
+      <p class="demo-note" role="note">
+        <strong>Demo booking.</strong> This site isn't connected to a booking system. Requests are saved only in this browser — no place is reserved, no payment is taken and no email is sent.
+      </p>
+    </header>
+
+    <noscript><p class="form-error">The booking form needs JavaScript. Please enable it to see available sessions.</p></noscript>
+
+    <form class="booking" id="booking-form" novalidate data-booking>
+      <div class="booking__steps">
+        <fieldset class="step" id="step-type">
+          <legend><span class="step__num">1</span> Session type</legend>
+          <div class="type-options">
+            <label class="type-option">
+              <input type="radio" name="type" value="shared" checked />
+              <span class="type-option__body">
+                <span class="type-option__title">Shared session</span>
+                <span class="type-option__price">£16 <small>per person · £11 concession</small></span>
+                <span class="type-option__desc">Share the cabin with up to 11 others. Book 1–6 spaces.</span>
+              </span>
+            </label>
+            <label class="type-option">
+              <input type="radio" name="type" value="private" />
+              <span class="type-option__body">
+                <span class="type-option__title">Private hire</span>
+                <span class="type-option__price">£120 <small>per session</small></span>
+                <span class="type-option__desc">The whole cabin and deck for up to 8 people.</span>
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset class="step" id="step-guests">
+          <legend><span class="step__num">2</span> Who's coming</legend>
+          <div data-guests-shared>
+            <div class="counter">
+              <div>
+                <span class="counter__label" id="adults-label">Full price</span>
+                <span class="counter__hint">£16 each</span>
+              </div>
+              <div class="counter__ctrl" role="group" aria-labelledby="adults-label">
+                <button type="button" class="counter__btn" data-step="adults" data-delta="-1" aria-label="Remove a full-price space">−</button>
+                <output class="counter__value" data-count="adults" aria-live="polite">1</output>
+                <button type="button" class="counter__btn" data-step="adults" data-delta="1" aria-label="Add a full-price space">+</button>
+              </div>
+            </div>
+            <div class="counter">
+              <div>
+                <span class="counter__label" id="conc-label">Concession</span>
+                <span class="counter__hint">£11 · students, over-65s, Universal Credit</span>
+              </div>
+              <div class="counter__ctrl" role="group" aria-labelledby="conc-label">
+                <button type="button" class="counter__btn" data-step="concessions" data-delta="-1" aria-label="Remove a concession space">−</button>
+                <output class="counter__value" data-count="concessions" aria-live="polite">0</output>
+                <button type="button" class="counter__btn" data-step="concessions" data-delta="1" aria-label="Add a concession space">+</button>
+              </div>
+            </div>
+            <p class="step__hint" data-guest-hint>Up to 6 spaces per booking.</p>
+          </div>
+          <div data-guests-private hidden>
+            <div class="counter">
+              <div>
+                <span class="counter__label" id="group-label">People in your group</span>
+                <span class="counter__hint">Flat £120, up to 8</span>
+              </div>
+              <div class="counter__ctrl" role="group" aria-labelledby="group-label">
+                <button type="button" class="counter__btn" data-step="group" data-delta="-1" aria-label="One fewer person">−</button>
+                <output class="counter__value" data-count="group" aria-live="polite">4</output>
+                <button type="button" class="counter__btn" data-step="group" data-delta="1" aria-label="One more person">+</button>
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="step" id="step-date">
+          <legend><span class="step__num">3</span> Day</legend>
+          <p class="step__hint">Showing the next two weeks. We're closed on Mondays.</p>
+          <div class="dates" data-dates></div>
+        </fieldset>
+
+        <fieldset class="step" id="step-time" aria-describedby="time-status">
+          <legend><span class="step__num">4</span> Time</legend>
+          <p class="step__hint" id="time-status" data-time-status aria-live="polite">Pick a day to see times.</p>
+          <div class="slots" data-slots></div>
+        </fieldset>
+
+        <fieldset class="step" id="step-details">
+          <legend><span class="step__num">5</span> Your details</legend>
+          <div class="fields">
+            <div class="field">
+              <label for="name">Full name</label>
+              <input id="name" name="name" type="text" autocomplete="name" required aria-describedby="name-error" />
+              <p class="field__error" id="name-error" hidden></p>
+            </div>
+            <div class="field">
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" autocomplete="email" required aria-describedby="email-hint email-error" />
+              <p class="field__hint" id="email-hint">Where a real booking confirmation would go.</p>
+              <p class="field__error" id="email-error" hidden></p>
+            </div>
+            <div class="field">
+              <label for="phone">Phone <span class="optional">(optional)</span></label>
+              <input id="phone" name="phone" type="tel" autocomplete="tel" aria-describedby="phone-hint phone-error" />
+              <p class="field__hint" id="phone-hint">Only used if we have to cancel for weather.</p>
+              <p class="field__error" id="phone-error" hidden></p>
+            </div>
+            <div class="field field--check">
+              <input id="rules" name="rules" type="checkbox" required aria-describedby="rules-error" />
+              <label for="rules">I've read the <a href="index.html#first-time" target="_blank" rel="noopener">house rules and health note<span class="visually-hidden"> (opens in a new tab)</span></a>, and everyone in my booking will follow them.</label>
+              <p class="field__error" id="rules-error" hidden></p>
+            </div>
+          </div>
+        </fieldset>
+      </div>
+
+      <aside class="summary" aria-labelledby="summary-title">
+        <div class="summary__card">
+          <h2 id="summary-title">Your session</h2>
+          <dl class="summary__list">
+            <div><dt>Session</dt><dd data-sum="type">—</dd></div>
+            <div><dt>Day</dt><dd data-sum="date">Not chosen</dd></div>
+            <div><dt>Time</dt><dd data-sum="time">Not chosen</dd></div>
+            <div><dt>Guests</dt><dd data-sum="guests">—</dd></div>
+          </dl>
+          <div class="summary__total">
+            <span>Total</span>
+            <b data-sum="total">£16</b>
+          </div>
+          <p class="summary__pay">Payable at the hatch in this demo — nothing is charged online.</p>
+
+          <div class="form-error" data-form-error role="alert" hidden></div>
+
+          <button class="btn summary__submit" type="submit" data-submit>
+            <span class="spinner" aria-hidden="true"></span>
+            <span data-submit-label>Request booking</span>
+          </button>
+          <p class="summary__small">Free cancellation up to 24 hours before.</p>
+        </div>
+      </aside>
+    </form>
+
+    <section class="success" data-success hidden aria-labelledby="success-title" tabindex="-1">
+      <div class="success__mark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="24" cy="24" r="21"/><path d="m14 24.5 7 7 13-14"/></svg>
+      </div>
+      <p class="eyebrow">Request saved in this browser</p>
+      <h2 id="success-title">See you on the pontoon — in theory.</h2>
+      <p class="success__ref">Demo reference <b data-success-ref></b></p>
+      <dl class="success__details" data-success-details></dl>
+      <p class="demo-note"><strong>Nothing was booked.</strong> This is a demonstration: no space has been reserved with Kelda, no payment was taken and no confirmation email has been sent. The request is stored only in this browser so you can see how the flow works.</p>
+      <div class="success__actions">
+        <button class="btn" type="button" data-again>Make another request</button>
+        <a class="btn btn--ghost" href="#my-requests">View saved requests</a>
+      </div>
+    </section>
+
+    <section class="mine" id="my-requests" aria-labelledby="mine-title">
+      <div class="mine__head">
+        <h2 id="mine-title">Saved demo requests</h2>
+        <p>Stored in this browser only. Cancelling frees the space in the demo timetable.</p>
+      </div>
+      <p class="mine__status visually-hidden" aria-live="polite" data-mine-status></p>
+      <div data-mine></div>
+    </section>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="site-footer__grid">
+      <div>
+        <a class="wordmark" href="index.html" aria-label="Kelda, home">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#f3ede2"/><path d="M8 21 16 11l8 10z" fill="#e48d55"/><path d="M6 24h20" stroke="#10272c" stroke-width="1.6"/></svg>
+          <span>Kelda</span>
+        </a>
+        <p>Wood-fired sauna on Slipway 3, Old Harbour Boatyard.</p>
+      </div>
+      <div>
+        <h2>Explore</h2>
+        <ul>
+          <li><a href="index.html#ritual">The ritual</a></li>
+          <li><a href="index.html#sessions">Sessions &amp; prices</a></li>
+          <li><a href="index.html#first-time">First time</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Plan</h2>
+        <ul>
+          <li><a href="book.html">Book a session</a></li>
+          <li><a href="index.html#visit">Opening hours</a></li>
+          <li><a href="index.html#faq">FAQ</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="site-footer__base">Kelda is a design concept. Bookings on this site are a demonstration and are stored only in your browser.</p>
+  </div>
+</footer>
+
+<script src="js/common.js"></script>
+<script src="js/booking.js"></script>
+</body>
+</html>
