@@ -1,0 +1,128 @@
+{
+ "skyline34": {
+  "name": "Nissan Skyline GT-R V-Spec II (BNR34)",
+  "tier": "Epic",
+  "price": 210,
+  "series": "2025 Car Culture Timeless Icons",
+  "chase": "Chase"
+ },
+ "boneshaker": {
+  "name": "Bone Shaker",
+  "tier": "Epic",
+  "price": 2363.38,
+  "series": "Virtual Garage Series 1 Main Series",
+  "chase": null
+ },
+ "gt3rs": {
+  "name": "Porsche 911 GT3 RS",
+  "tier": "Uncommon",
+  "price": 389.99,
+  "series": "Virtual Garage Series 5 Main Series",
+  "chase": null
+ },
+ "m3": {
+  "name": "'92 BMW M3",
+  "tier": "Uncommon",
+  "price": 85,
+  "series": "Power Trip (2026)",
+  "chase": "Chase"
+ },
+ "kombi": {
+  "name": "VOLKSWAGEN KOOL KOMBI",
+  "tier": "Epic",
+  "price": 1149.99,
+  "series": "HWC.com Special Editions",
+  "chase": null
+ },
+ "gt2": {
+  "name": "Porsche 993 GT2",
+  "tier": "Epic",
+  "price": 790,
+  "series": "2016 HotWheelsCollectors.com Special Editions",
+  "chase": null
+ },
+ "mclaren": {
+  "name": "McLaren F1 GTR",
+  "tier": "Common",
+  "price": 209.99,
+  "series": "Virtual Garage Series 4 Main Series",
+  "chase": null
+ },
+ "essenza": {
+  "name": "Lamborghini Essenza SCV12",
+  "tier": "Epic",
+  "price": 117.5,
+  "series": "2022 Car Culture Exotic Envy",
+  "chase": "Chase"
+ },
+ "s2000": {
+  "name": "Honda S2000",
+  "tier": "Uncommon",
+  "price": 349.95,
+  "series": "Virtual Garage Series 2 Main Series",
+  "chase": null
+ },
+ "datsun": {
+  "name": "DATSUN BLUEBIRD WAGON (510)",
+  "tier": "Rare",
+  "price": 139.25,
+  "series": "Virtual Garage Series 7 Main Series",
+  "chase": null
+ },
+ "skyline32": {
+  "name": "Nissan Skyline GT-R (BNR32)",
+  "tier": "Common",
+  "price": 150,
+  "series": "Vintage Racing (2026)",
+  "chase": "Chase"
+ },
+ "gasser": {
+  "name": "'55 Chevy Bel Air Gasser",
+  "tier": "Epic",
+  "price": 750,
+  "series": "Virtual Garage Series 2 Main Series",
+  "chase": null
+ },
+ "diablo": {
+  "name": "1995 Lamborghini Diablo SV",
+  "tier": "Uncommon",
+  "price": 85,
+  "series": "26th Annual Collectors Nationals",
+  "chase": null
+ },
+ "porsche935": {
+  "name": "'78 Porsche 935-78",
+  "tier": "Common",
+  "price": 135.5,
+  "series": "Virtual Garage Series 6 Main Series",
+  "chase": null
+ },
+ "audi": {
+  "name": "HW 94 AUDI AVANT RS2",
+  "tier": "Common",
+  "price": 135,
+  "series": "Virtual Garage Series 10 Main Series",
+  "chase": null
+ },
+ "4runner": {
+  "name": "2018 Toyota 4Runner",
+  "tier": "Rare",
+  "price": 94.99,
+  "series": "Car Culture: Road Trip (2026)",
+  "chase": "Chase"
+ },
+ "gt40": {
+  "name": "Ford GT-40",
+  "tier": "Epic",
+  "price": 599.99,
+  "series": "HWC.com Special Editions",
+  "chase": null
+ },
+ "roxy": {
+  "name": "\"ROXY\" PORSCHE 911 GT3 R (992)",
+  "tier": "Epic",
+  "price": 595.98,
+  "series": "2024 Car Culture Race Day",
+  "chase": "Chase"
+ }
+}
