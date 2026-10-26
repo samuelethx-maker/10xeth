@@ -63,7 +63,7 @@ export const flicker = (t: number, at: number) => {
 /** Official logo raster; its black backdrop drops out with screen blending. */
 export const Logo: React.FC<{ size: number; glow?: number; style?: React.CSSProperties }> = ({ size, glow = 1, style }) => (
   <div style={{ position: 'relative', width: size, height: size, ...style }}>
-    <Img src={staticFile('loadout/logo-badge.png')} style={{ position: 'absolute', inset: 0, width: size, height: size, mixBlendMode: 'screen', filter: `drop-shadow(0 0 ${18 * glow}px rgba(32,242,255,${0.55 * glow})) brightness(${0.4 + glow * 0.75})` }} />
+    <Img src={staticFile('loadout/logo.png')} style={{ position: 'absolute', inset: 0, width: size, height: size, filter: `drop-shadow(0 0 ${18 * glow}px rgba(32,242,255,${0.55 * glow})) brightness(${0.4 + glow * 0.75})` }} />
   </div>
 );
 
