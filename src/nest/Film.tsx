@@ -264,7 +264,7 @@ const Swap: React.FC<{ t: number }> = ({ t }) => {
 /* ------------------------------ 4. veNEST ------------------------------ */
 
 const Lock: React.FC<{ t: number }> = ({ t }) => {
-  const lock = wi(3, 0), ve = wi(3, 3), vote = wi(3, 4), cap = wi(3, 6), fees = wi(3, 11);
+  const lock = wi(3, 0), ve = wi(3, 3), vote = wi(3, 4), cap = wi(3, 6);
   const slide = io(t, lock + 0.1, ve + 0.4, 0, 1, Easing.inOut(Easing.cubic));
   const gauges = [
     { pair: ['HYPE', 'USDC'], v: 0.34 }, { pair: ['UBTC', 'HYPE'], v: 0.22 }, { pair: ['NEST', 'HYPE'], v: 0.19 }, { pair: ['UETH', 'USDC'], v: 0.13 },
@@ -317,9 +317,9 @@ const Lock: React.FC<{ t: number }> = ({ t }) => {
       <div style={{ position: 'absolute', left: 110, top: 600, ...rise(t, cap - 0.15, 0.5, 30) }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 26 }}>
           <span style={{ fontFamily: SANS, fontWeight: 700, fontSize: 230, lineHeight: 0.9, letterSpacing: '-0.06em', background: `linear-gradient(180deg, #fff, ${C.mint} 50%, ${C.teal})`, WebkitBackgroundClip: 'text', color: 'transparent', filter: `drop-shadow(0 0 40px ${C.teal}55)` }}>{pct}%</span>
-          <div style={{ fontFamily: SANS, fontWeight: 600, fontSize: 50, lineHeight: 1.05, color: C.white, letterSpacing: '-0.03em', ...rise(t, fees - 0.1, 0.45, 20) }}>of trading fees<br /><span style={{ color: C.teal }}>to veNEST voters</span></div>
+          <div style={{ fontFamily: SANS, fontWeight: 600, fontSize: 50, lineHeight: 1.05, color: C.white, letterSpacing: '-0.03em', ...rise(t, cap + 0.35, 0.45, 20) }}>of trading fees<br /><span style={{ color: C.teal }}>to veNEST voters</span></div>
         </div>
-        <div style={{ marginTop: 18, display: 'flex', gap: 12, ...rise(t, fees + 0.25, 0.4, 12) }}>
+        <div style={{ marginTop: 18, display: 'flex', gap: 12, ...rise(t, cap + 0.8, 0.4, 12) }}>
           <Chip color={C.lime}>+ voting incentives</Chip><Chip>Weekly epochs</Chip>
         </div>
       </div>
