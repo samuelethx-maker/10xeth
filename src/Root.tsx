@@ -6,6 +6,8 @@ import { Film } from './Film';
 import { HostTest } from './ripcars/HostTest';
 import { RipCarsFilm } from './ripcars/Film';
 import { LoadoutFilm } from './loadout/Film';
+import { NestFilm } from './nest/Film';
+import NT from './nest/timeline.json';
 import LT from './loadout/timeline.json';
 import RT from './ripcars/timeline.json';
 
@@ -26,6 +28,7 @@ export const RemotionRoot: React.FC = () => (
   <>
     <Composition id="DexstockFilm" component={Film} durationInFrames={T.fps * T.duration} fps={T.fps} width={1920} height={1080} />
     <Composition id="CharTest" component={CharTest} durationInFrames={60} fps={T.fps} width={1920} height={1080} />
+    <Composition id="NestFilm" component={NestFilm} durationInFrames={NT.fps * NT.duration} fps={NT.fps} width={1920} height={1080} />
     <Composition id="LoadoutFilm" component={LoadoutFilm} durationInFrames={LT.fps * LT.duration} fps={LT.fps} width={1920} height={1080} />
     <Composition id="RipCarsFilm" component={RipCarsFilm} durationInFrames={RT.fps * RT.duration} fps={RT.fps} width={1920} height={1080} />
     <Composition id="RipHostTest" component={HostTest} durationInFrames={60} fps={60} width={1920} height={1080} />
