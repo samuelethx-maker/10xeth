@@ -34,7 +34,7 @@ const market = (seed: number, n: number, start: number, drift: number, vol: numb
   return { price, floor };
 };
 
-const Candles: React.FC<{ price: number[]; floor: number[]; w: number; h: number; p: number; lo: number; hi: number; per?: number; ghost?: number[]; flash?: number; floorLabel?: boolean }> = ({ price, floor, w, h, p, lo, hi, per = 4, ghost, flash = 0, floorLabel = true }) => {
+const Candles: React.FC<{ price: number[]; floor: number[]; w: number; h: number; p: number; lo: number; hi: number; per?: number; ghost?: number[]; flash?: number; floorLabel?: boolean; fillTop?: number }> = ({ price, floor, w, h, p, lo, hi, per = 4, ghost, flash = 0, floorLabel = true, fillTop = 0.34 }) => {
   const n = Math.floor(price.length / per);
   const shown = Math.max(1, Math.floor(n * p));
   const cw = w / n;
@@ -47,7 +47,7 @@ const Candles: React.FC<{ price: number[]; floor: number[]; w: number; h: number
   return (
     <svg width={w} height={h} style={{ overflow: 'visible', display: 'block' }}>
       <defs>
-        <linearGradient id={id} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={C.cyan} stopOpacity={0.34 + flash * 0.4} /><stop offset="1" stopColor={C.cyan} stopOpacity={0} /></linearGradient>
+        <linearGradient id={id} x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor={C.cyan} stopOpacity={fillTop + flash * 0.4} /><stop offset="1" stopColor={C.cyan} stopOpacity={0} /></linearGradient>
       </defs>
       {[0.25, 0.5, 0.75].map((g) => <line key={g} x1={0} x2={w} y1={h * g} y2={h * g} stroke="rgba(255,255,255,0.05)" />)}
       {ghost && <path d={ghost.slice(0, Math.floor(ghost.length * p)).map((v, i) => `${i ? 'L' : 'M'}${((i / (ghost.length - 1)) * w).toFixed(1)},${Math.min(h + 40, y(v)).toFixed(1)}`).join(' ')} fill="none" stroke={C.sell} strokeWidth={2.5} strokeDasharray="8 8" opacity={0.55} />}
@@ -412,7 +412,7 @@ const Dump: React.FC<{ t: number }> = ({ t }) => {
       <Card glow={0.45 + flash * 0.6} style={{ left: X0, top: 120, width: 1030, height: 640, ...rise(t, S.dump, 0.45, 40) }}>
         <div style={{ position: 'absolute', left: 28, top: 24 }}><TokenHeader t={t} mcap={data.price[Math.floor(N * p) - 1]} floor={data.floor[Math.floor(N * p) - 1]} seed={9} name="Every holder sells" tick="replay" /></div>
         <div style={{ position: 'absolute', left: 28, top: 140 }}>
-          <Candles price={data.price} floor={data.floor} ghost={data.ghost} w={840} h={450} p={p} lo={1.2e5} hi={1.3e7} per={2} flash={flash} />
+          <Candles price={data.price} floor={data.floor} ghost={data.ghost} w={840} h={450} p={p} lo={1.2e5} hi={1.3e7} per={2} flash={flash} fillTop={0.13} />
         </div>
         {/* impact ring on the floor */}
         {t > hit && <div style={{ position: 'absolute', left: 28 + 840 * 0.47 - 200 * wave, top: 140 + 450 * 0.32 - 40 * wave, width: 400 * wave, height: 80 * wave, borderRadius: '50%', border: `3px solid ${C.cyan}`, opacity: 1 - wave }} />}
