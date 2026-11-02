@@ -231,15 +231,15 @@ def snap_word(s, e, prev_e, next_s):
     """Whisper edges can sit ~50-100 ms off. Edges in silence move onto the voiced audio; edges inside sound
     grow outward across the contiguous voiced run (bounded by the neighbouring words)."""
     if not voiced[fr(s)]:
-        w = [k for k in range(fr(s - 0.08), fr(s + 0.2)) if voiced[k]]
-        if w: s = w[0] / FPS
+        on = [k for k in range(fr(s - 0.08), fr(s + 0.25)) if voiced[k] and not voiced[k - 1] and k / FPS > prev_e]
+        if on: s = min(on, key=lambda k: abs(k / FPS - s)) / FPS
     else:
         k = fr(s)
         while k > fr(s - 0.12) and voiced[k - 1] and (k - 1) / FPS > prev_e: k -= 1
         s = k / FPS
     if not voiced[fr(e)]:
-        w = [k for k in range(fr(e - 0.2), fr(e + 0.08)) if voiced[k]]
-        if w: e = (w[-1] + 1) / FPS
+        off = [k for k in range(fr(e - 0.25), fr(e + 0.08)) if voiced[k] and not voiced[k + 1] and k / FPS < next_s]
+        if off: e = (min(off, key=lambda k: abs(k / FPS - e)) + 1) / FPS
     else:
         k = fr(e)
         while k < fr(e + 0.15) and voiced[k + 1] and (k + 1) / FPS < next_s: k += 1
@@ -264,6 +264,21 @@ for seg in T['vo']:
         ph = phones(w)
         wts = np.array([1.6 if VIS[p] in 'AEOU' else 0.7 if p in ('P', 'B', 'T', 'D', 'K', 'G') else 1.0 for p in ph])
         edges = s + (e - s) * np.concatenate([[0], np.cumsum(wts) / wts.sum()])
+        # warp so each vowel's centre sits on its syllable's energy peak (when the peak count matches)
+        vow = [j for j, p in enumerate(ph) if VIS[p] in 'AEOU' and p not in ('W', 'R', 'Y')]
+        if len(vow) >= 2:
+            k0, k1 = fr(s), fr(e)
+            env = np.convolve(rms[k0:k1 + 1], np.ones(3) / 3, 'same')
+            pk = [k for k in range(1, len(env) - 1) if env[k] >= env[k - 1] and env[k] > env[k + 1] and env[k] > 0.03]
+            merged = []
+            for k in pk:  # keep peaks separated by a real dip
+                if merged and env[merged[-1]:k + 1].min() > 0.75 * min(env[merged[-1]], env[k]):
+                    if env[k] > env[merged[-1]]: merged[-1] = k
+                else: merged.append(k)
+            if len(merged) == len(vow):
+                nom = [(edges[j] + edges[j + 1]) / 2 for j in vow]
+                real = [(k0 + k) / FPS for k in merged]
+                edges = np.interp(edges, [s] + nom + [e], [s] + real + [e])
         for j, p in enumerate(ph):
             a, b2 = edges[j], edges[j + 1]
             if VIS[p] == 'M':
