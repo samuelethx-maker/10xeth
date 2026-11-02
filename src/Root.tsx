@@ -7,6 +7,8 @@ import { HostTest } from './ripcars/HostTest';
 import { RipCarsFilm } from './ripcars/Film';
 import { LoadoutFilm } from './loadout/Film';
 import { NestFilm } from './nest/Film';
+import { HoodBake } from './fobo/HoodArt';
+import { FoboHostTest } from './fobo/HostTest';
 import NT from './nest/timeline.json';
 import LT from './loadout/timeline.json';
 import RT from './ripcars/timeline.json';
@@ -28,6 +30,9 @@ export const RemotionRoot: React.FC = () => (
   <>
     <Composition id="DexstockFilm" component={Film} durationInFrames={T.fps * T.duration} fps={T.fps} width={1920} height={1080} />
     <Composition id="CharTest" component={CharTest} durationInFrames={60} fps={T.fps} width={1920} height={1080} />
+    <Composition id="FoboHostTest" component={FoboHostTest} durationInFrames={1} fps={60} width={1920} height={1080} />
+    <Composition id="FoboHoodHead" component={HoodBake} defaultProps={{ part: 'head' as const }} durationInFrames={1} fps={60} width={2000} height={2500} />
+    <Composition id="FoboHoodBody" component={HoodBake} defaultProps={{ part: 'body' as const }} durationInFrames={1} fps={60} width={2000} height={2500} />
     <Composition id="NestFilm" component={NestFilm} durationInFrames={NT.fps * NT.duration} fps={NT.fps} width={1920} height={1080} />
     <Composition id="LoadoutFilm" component={LoadoutFilm} durationInFrames={LT.fps * LT.duration} fps={LT.fps} width={1920} height={1080} />
     <Composition id="RipCarsFilm" component={RipCarsFilm} durationInFrames={RT.fps * RT.duration} fps={RT.fps} width={1920} height={1080} />
