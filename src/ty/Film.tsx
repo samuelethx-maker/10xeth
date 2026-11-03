@@ -248,7 +248,7 @@ const Intent: React.FC<{ t: number }> = ({ t }) => {
         ))}
         <div style={{ position: 'absolute', left: 28, right: 28, bottom: 24, display: 'flex', gap: 10 }}>
           {steps.map((s, i) => {
-            const done = io(t, exe + 0.15 + i * 0.16, exe + 0.3 + i * 0.16);
+            const done = io(t, exe + 0.08 + i * 0.12, exe + 0.2 + i * 0.12);
             return (
               <div key={s} style={{ flex: 1, padding: '12px 14px', borderRadius: 12, border: `1px solid ${done > 0.5 ? C.green + '77' : C.border}`, background: done > 0.5 ? C.accentSurface : 'rgba(255,255,255,0.02)', fontFamily: SANS, fontSize: 15, color: done > 0.5 ? C.white : C.dim, display: 'flex', alignItems: 'center', gap: 10, opacity: io(t, exe - 0.1, exe + 0.2) }}>
                 <span style={{ width: 22, height: 22, borderRadius: 22, background: done > 0.5 ? C.green : 'transparent', border: `1.5px solid ${done > 0.5 ? C.green : C.border}`, color: C.greenDeep, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, transform: `scale(${0.6 + done * 0.4})` }}>{done > 0.5 ? '✓' : ''}</span>
@@ -259,7 +259,7 @@ const Intent: React.FC<{ t: number }> = ({ t }) => {
         </div>
       </Card>
       <div style={{ position: 'absolute', left: X0, top: 740, width: 1030, height: 72, borderRadius: 14, background: C.green, color: C.greenDeep, fontFamily: SANS, fontWeight: 700, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, transform: `scale(${1 - press * 0.03})`, boxShadow: `0 0 ${30 + press * 50}px rgba(0,233,151,0.45)`, ...rise(t, best + 0.1, 0.4, 20) }}>
-        {t > exe + 0.85 ? '✓ Routed · 0.25 yBTC on Robinhood Chain' : 'Execute route'}
+        {t > exe + 0.6 ? '✓ Routed · 0.25 yBTC on Robinhood Chain' : 'Execute route'}
       </div>
       <div style={{ position: 'absolute', left: X0, top: 860 }}>
         <Kinetic t={t} at={tell - 0.05} size={54} text="Tell it what to move." stagger={0.08} />
@@ -335,7 +335,7 @@ const Routes: React.FC<{ t: number }> = ({ t }) => {
         </div>
         <div style={{ position: 'absolute', left: 20, right: 20, top: 118 }}>
           {assets.map((a, i) => {
-            const p = io(t, crop - 0.15 + i * 0.1, crop + 0.25 + i * 0.1);
+            const p = io(t, route - 0.1 + i * 0.1, route + 0.3 + i * 0.1);
             return (
               <div key={a.s} style={{ display: 'flex', alignItems: 'center', gap: 14, height: 96, padding: '0 14px', marginBottom: 10, borderRadius: 14, background: 'rgba(255,255,255,0.025)', border: `1px solid ${C.border}`, opacity: p, transform: `translateX(${(1 - p) * 40}px)` }}>
                 <ChainBadge id={a.from} size={36} />

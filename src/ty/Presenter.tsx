@@ -151,10 +151,10 @@ export const Host: React.FC<HostProps> = ({ t, vis, frame, level = 0, emphasis =
       </defs>
 
       {/* neck + body */}
-      <path d="M338 440 L462 440 L466 560 L462 700 Q400 728 338 700 L334 560 Z" fill={`url(#neck${u})`} />
+      <path d="M336 440 L464 440 L468 560 L466 660 Q400 690 334 660 L332 560 Z" fill={`url(#neck${u})`} />
       <path d="M338 560 Q400 600 462 560 L462 610 Q400 640 338 610 Z" fill="#5A3828" opacity={0.35} />
       <g transform={`translate(400 1000) scale(${1 + breathe * 0.5} ${1 + breathe}) translate(-400 -1000)`}>
-        <image href={staticFile('ty/body.png')} x={0} y={0} width={800} height={1000} />
+        <image href={staticFile('ty/body.png')} x={-12} y={-48} width={824} height={1030} />
       </g>
 
       <g transform={head}>
