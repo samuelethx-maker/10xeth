@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <title>YARD</title>
+  <desc>TickerYard protocol mark, matching the application header.</desc>
+  <rect width="32" height="32" fill="#000"/>
+  <path transform="translate(2.4 2.4) scale(.85)" d="M6 3h4v10h4V3h4v10h4V3h4v14h-8v11h-4V17H6Z" fill="#00e997"/>
+</svg>
