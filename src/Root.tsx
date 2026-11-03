@@ -10,6 +10,8 @@ import { NestFilm } from './nest/Film';
 import { HoodBake } from './fobo/HoodArt';
 import { TyBake } from './ty/TyArt';
 import { TyHostTest } from './ty/HostTest';
+import { TickerYardFilm } from './ty/Film';
+import TYT from './ty/timeline.json';
 import { FoboFilm } from './fobo/Film';
 import FT from './fobo/timeline.json';
 import { FoboHostTest } from './fobo/HostTest';
@@ -34,6 +36,7 @@ export const RemotionRoot: React.FC = () => (
   <>
     <Composition id="DexstockFilm" component={Film} durationInFrames={T.fps * T.duration} fps={T.fps} width={1920} height={1080} />
     <Composition id="CharTest" component={CharTest} durationInFrames={60} fps={T.fps} width={1920} height={1080} />
+    <Composition id="TickerYardFilm" component={TickerYardFilm} durationInFrames={TYT.fps * TYT.duration} fps={TYT.fps} width={1920} height={1080} />
     <Composition id="TyHair" component={TyBake} defaultProps={{ part: 'hair' as const }} durationInFrames={1} fps={60} width={2000} height={2500} />
     <Composition id="TyBody" component={TyBake} defaultProps={{ part: 'body' as const }} durationInFrames={1} fps={60} width={2000} height={2500} />
     <Composition id="TyHostTest" component={TyHostTest} durationInFrames={1} fps={60} width={1920} height={1080} />
