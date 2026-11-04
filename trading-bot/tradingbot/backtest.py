@@ -1,4 +1,5 @@
-"""Bar-by-bar backtester for one instrument / one strategy.
+"""Bar-by-bar execution engine shared by single-instrument backtests, the portfolio
+backtest and the simulated paper trader, so all three apply identical rules.
 
 Execution model (deliberately conservative):
   * signals from bar i's close are filled at bar i+1's open
@@ -6,17 +7,21 @@ Execution model (deliberately conservative):
   * stops/targets are checked against each bar's high/low; if both are touched in
     the same bar the stop is assumed to fill first; gaps through a stop fill at the open
   * commissions charged on entry and exit
+  * financing / funding charged on notional for the time a position is held
+Position size is based on realised cash, not open P&L.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 import numpy as np
 import pandas as pd
 
-from .instruments import Instrument
+from .instruments import Instrument, get_instrument
 from .risk import RiskConfig, RiskManager, position_size
+
+HOURS_PER_YEAR = 24 * 365
 
 
 @dataclass
@@ -32,11 +37,27 @@ class Trade:
     exit_time: pd.Timestamp | None = None
     exit_price: float | None = None
     pnl: float = 0.0
+    financing: float = 0.0
     exit_reason: str = ""
 
     @property
     def r_multiple(self) -> float:
         return self.pnl / self.risk_usd if self.risk_usd else 0.0
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        for k in ("entry_time", "exit_time"):
+            d[k] = d[k].isoformat() if d[k] is not None else None
+        d["target"] = None if np.isnan(self.target) else self.target
+        return d
+
+    @classmethod
+    def from_dict(cls, d: dict) -> Trade:
+        d = dict(d)
+        for k in ("entry_time", "exit_time"):
+            d[k] = pd.Timestamp(d[k]) if d[k] else None
+        d["target"] = np.nan if d["target"] is None else d["target"]
+        return cls(**d)
 
 
 @dataclass
@@ -52,14 +73,303 @@ class BacktestResult:
         return pd.DataFrame([{**t.__dict__, "r_multiple": t.r_multiple} for t in self.trades])
 
 
-def _quote_to_usd(inst: Instrument, price: float, fx: float | None) -> float:
+def _quote_to_usd(inst: Instrument, price: float, usdjpy: float | None) -> float:
     if inst.quote_ccy == "USD":
         return 1.0
     if inst.symbol == "USDJPY":
         return 1.0 / price
-    if fx is None:
+    if usdjpy is None or np.isnan(usdjpy):
         raise ValueError(f"{inst.symbol} needs a quote->USD rate (e.g. --usdjpy 150)")
-    return 1.0 / fx  # fx given as USD/quote, e.g. USDJPY
+    return 1.0 / usdjpy
+
+
+def financing_per_bar(
+    inst: Instrument, index: pd.DatetimeIndex, funding: pd.Series | None = None
+) -> tuple[np.ndarray, np.ndarray]:
+    """Fraction of notional charged at bar i to a position held since bar i-1
+    (long, short). Uses elapsed time, so weekends are charged too. With a funding
+    series (crypto perps), the actual 8h funding events in (t[i-1], t[i]] are used."""
+    # Unit-agnostic on purpose: DatetimeIndex resolution may be s/ms/us/ns.
+    if funding is not None and len(funding):
+        f = funding[(funding.index > index[0]) & (funding.index <= index[-1])]
+        pos = index.searchsorted(f.index, side="left")
+        long_ = np.bincount(pos, weights=f.to_numpy(), minlength=len(index))[: len(index)]
+        return long_, -long_
+    secs = (index - index[0]).total_seconds().to_numpy()
+    hours = np.diff(secs, prepend=0.0) / 3600
+    return inst.financing_long * hours / HOURS_PER_YEAR, inst.financing_short * hours / HOURS_PER_YEAR
+
+
+@dataclass
+class Leg:
+    """One instrument's bars + signals, as numpy arrays for speed."""
+
+    inst: Instrument
+    times: pd.DatetimeIndex
+    o: np.ndarray
+    h: np.ndarray
+    l: np.ndarray
+    c: np.ndarray
+    entry: np.ndarray
+    exit_l: np.ndarray
+    exit_s: np.ndarray
+    stop_d: np.ndarray
+    tgt_d: np.ndarray
+    fin_l: np.ndarray
+    fin_s: np.ndarray
+    usdjpy: np.ndarray | None = None  # optional per-bar USDJPY for JPY-quoted P&L
+
+    @classmethod
+    def build(
+        cls,
+        inst: Instrument,
+        bars: pd.DataFrame,
+        signals: pd.DataFrame,
+        funding: pd.Series | None = None,
+        financing: bool = True,
+        usdjpy: pd.Series | float | None = None,
+    ) -> Leg:
+        if financing:
+            fl, fs = financing_per_bar(inst, bars.index, funding)
+        else:
+            fl = fs = np.zeros(len(bars))
+        if isinstance(usdjpy, pd.Series):
+            fx = usdjpy.reindex(bars.index, method="ffill").to_numpy()
+        elif usdjpy is not None:
+            fx = np.full(len(bars), float(usdjpy))
+        else:
+            fx = None
+        return cls(
+            inst, bars.index,
+            *(bars[k].to_numpy(float) for k in ("open", "high", "low", "close")),
+            signals["entry"].to_numpy(), signals["exit_long"].to_numpy(bool),
+            signals["exit_short"].to_numpy(bool), signals["stop_dist"].to_numpy(float),
+            signals["target_dist"].to_numpy(float), fl, fs, fx,
+        )
+
+
+class Engine:
+    """Account state + rules. Feed bars with step(); serialisable for paper trading."""
+
+    def __init__(self, risk: RiskConfig | None = None, equity: float = 100_000.0,
+                 usdjpy: float = 150.0, record_equity: bool = True):
+        self.risk = risk or RiskConfig()
+        self.initial_equity = equity
+        self.cash = equity
+        self.rm = RiskManager.start(self.risk, equity)
+        self.pos: dict[str, Trade] = {}
+        self.pending_exit: set[str] = set()
+        self.pending_entry: dict[str, tuple[int, float, float]] = {}
+        self.last_close: dict[str, float] = {}
+        self.usdjpy = usdjpy
+        self.trades: list[Trade] = []
+        self.record_equity = record_equity
+        self.eq_times: list[pd.Timestamp] = []
+        self.eq_values: list[float] = []
+
+    # ----------------------------------------------------------- helpers
+    def _q2u(self, leg: Leg, i: int, price: float) -> float:
+        fx = leg.usdjpy[i] if leg.usdjpy is not None else self.usdjpy
+        return _quote_to_usd(leg.inst, price, fx)
+
+    def _pnl(self, inst: Instrument, t: Trade, price: float, q2u: float) -> float:
+        return (price - t.entry_price) * t.direction * t.qty * inst.multiplier * q2u
+
+    def _commission(self, inst: Instrument, qty: float, price: float, q2u: float) -> float:
+        return inst.commission_per_qty * qty + inst.commission_pct * qty * price * inst.multiplier * q2u
+
+    def _usd_mark(self, sym: str, price: float) -> float:
+        t = self.pos[sym]
+        inst = get_instrument(sym)
+        if inst.quote_ccy == "USD":
+            q2u = 1.0
+        elif sym == "USDJPY":
+            q2u = 1.0 / price
+        else:
+            q2u = 1.0 / self.usdjpy
+        return self._pnl(inst, t, price, q2u)
+
+    def equity(self, prices: dict[str, float] | None = None) -> float:
+        prices = prices or {}
+        return self.cash + sum(
+            self._usd_mark(s, prices.get(s, self.last_close.get(s, t.entry_price)))
+            for s, t in self.pos.items()
+        )
+
+    def _slots_ok(self, inst: Instrument) -> bool:
+        if len(self.pos) >= self.risk.max_open_positions:
+            return False
+        if inst.group:
+            same = sum(get_instrument(s).group == inst.group for s in self.pos)
+            if same >= self.risk.max_per_group:
+                return False
+        return True
+
+    def _close(self, leg: Leg, i: int, raw_price: float, reason: str) -> None:
+        sym = leg.inst.symbol
+        t = self.pos.pop(sym)
+        half = leg.inst.spread / 2 + leg.inst.slippage
+        fill = raw_price - t.direction * half
+        q2u = self._q2u(leg, i, fill)
+        gross = self._pnl(leg.inst, t, fill, q2u)
+        cost = self._commission(leg.inst, t.qty, fill, q2u)
+        t.pnl += gross - cost
+        self.cash += gross - cost
+        t.exit_time, t.exit_price, t.exit_reason = leg.times[i], fill, reason
+        self.trades.append(t)
+
+    # -------------------------------------------------------------- step
+    def step(self, t: pd.Timestamp, rows: list[tuple[Leg, int]]) -> None:
+        """Process every leg that has a bar starting at time t."""
+        opens = {leg.inst.symbol: leg.o[i] for leg, i in rows}
+        self.rm.on_new_day(t.normalize(), self.equity(opens))
+
+        # 0) financing for positions carried into this bar
+        for leg, i in rows:
+            p = self.pos.get(leg.inst.symbol)
+            if p is not None:
+                rate = leg.fin_l[i] if p.direction == 1 else leg.fin_s[i]
+                if rate:
+                    px = leg.o[i]
+                    cost = rate * p.qty * px * leg.inst.multiplier * self._q2u(leg, i, px)
+                    self.cash -= cost
+                    p.pnl -= cost
+                    p.financing += cost
+
+        # 1) actions decided at the previous close, filled at this open
+        for leg, i in rows:
+            sym = leg.inst.symbol
+            if sym in self.pending_exit and sym in self.pos:
+                self._close(leg, i, leg.o[i], "signal")
+            self.pending_exit.discard(sym)
+        for leg, i in rows:
+            sym, inst = leg.inst.symbol, leg.inst
+            pe = self.pending_entry.pop(sym, None)
+            if pe is None or sym in self.pos or not self.rm.can_open() or not self._slots_ok(inst):
+                continue
+            d, sd, td = pe
+            half = inst.spread / 2 + inst.slippage
+            fill = leg.o[i] + d * half
+            q2u = self._q2u(leg, i, fill)
+            qty = position_size(inst, self.cash, fill, sd, self.risk.risk_per_trade, q2u)
+            if qty > 0:
+                cost = self._commission(inst, qty, fill, q2u)
+                self.cash -= cost
+                self.pos[sym] = Trade(
+                    sym, d, qty, leg.times[i], fill,
+                    stop=fill - d * sd,
+                    target=fill + d * td if not np.isnan(td) else np.nan,
+                    risk_usd=sd * qty * inst.multiplier * q2u,
+                    pnl=-cost,
+                )
+
+        # 2) intrabar stop / target
+        for leg, i in rows:
+            p = self.pos.get(leg.inst.symbol)
+            if p is None:
+                continue
+            d = p.direction
+            o, h, l = leg.o[i], leg.h[i], leg.l[i]
+            stop_hit = (l <= p.stop) if d == 1 else (h >= p.stop)
+            tgt_hit = not np.isnan(p.target) and ((h >= p.target) if d == 1 else (l <= p.target))
+            if stop_hit:
+                gapped = (o <= p.stop) if d == 1 else (o >= p.stop)
+                self._close(leg, i, o if gapped else p.stop, "stop")
+            elif tgt_hit:
+                gapped = (o >= p.target) if d == 1 else (o <= p.target)
+                self._close(leg, i, o if gapped else p.target, "target")
+
+        # 3) end of bar: mark, risk checks, then read signals for the next open
+        for leg, i in rows:
+            self.last_close[leg.inst.symbol] = leg.c[i]
+            if leg.inst.symbol == "USDJPY":
+                self.usdjpy = leg.c[i]
+            elif leg.usdjpy is not None:
+                self.usdjpy = leg.usdjpy[i]
+        eq = self.equity()
+        if self.record_equity:
+            self.eq_times.append(t)
+            self.eq_values.append(eq)
+        if self.rm.update(eq, t):
+            self.pending_exit.update(self.pos)
+            self.pending_entry.clear()
+        for leg, i in rows:
+            sym = leg.inst.symbol
+            p = self.pos.get(sym)
+            if p is not None and ((p.direction == 1 and leg.exit_l[i]) or (p.direction == -1 and leg.exit_s[i])):
+                self.pending_exit.add(sym)
+            e = leg.entry[i]
+            if e == 0 or np.isnan(leg.stop_d[i]):
+                continue
+            exiting = sym in self.pending_exit
+            if p is None or exiting or p.direction != e:
+                if p is not None and p.direction != e:
+                    self.pending_exit.add(sym)  # reverse
+                self.pending_entry[sym] = (int(e), float(leg.stop_d[i]), float(leg.tgt_d[i]))
+
+    def close_all(self, rows: list[tuple[Leg, int]], reason: str = "end") -> None:
+        for leg, i in rows:
+            if leg.inst.symbol in self.pos:
+                self._close(leg, i, leg.c[i], reason)
+        if self.record_equity and self.eq_values:
+            self.eq_values[-1] = self.equity()
+
+    def equity_series(self) -> pd.Series:
+        return pd.Series(self.eq_values, index=pd.DatetimeIndex(self.eq_times), name="equity", dtype=float)
+
+    # ---------------------------------------------------- serialisation
+    def to_dict(self) -> dict:
+        rm = self.rm
+        return {
+            "initial_equity": self.initial_equity,
+            "cash": self.cash,
+            "usdjpy": self.usdjpy,
+            "positions": {s: t.to_dict() for s, t in self.pos.items()},
+            "pending_exit": sorted(self.pending_exit),
+            "pending_entry": {s: [d, sd, None if np.isnan(td) else td] for s, (d, sd, td) in self.pending_entry.items()},
+            "last_close": self.last_close,
+            "risk_state": {
+                "peak_equity": rm.peak_equity, "day_start_equity": rm.day_start_equity,
+                "current_day": rm.current_day.isoformat() if rm.current_day is not None else None,
+                "day_blocked": rm.day_blocked, "halted": rm.halted,
+            },
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict, risk: RiskConfig) -> Engine:
+        e = cls(risk, d["initial_equity"], d["usdjpy"], record_equity=False)
+        e.cash = d["cash"]
+        e.pos = {s: Trade.from_dict(t) for s, t in d["positions"].items()}
+        e.pending_exit = set(d["pending_exit"])
+        e.pending_entry = {s: (v[0], v[1], np.nan if v[2] is None else v[2]) for s, v in d["pending_entry"].items()}
+        e.last_close = d["last_close"]
+        rs = d["risk_state"]
+        e.rm.peak_equity, e.rm.day_start_equity = rs["peak_equity"], rs["day_start_equity"]
+        e.rm.current_day = pd.Timestamp(rs["current_day"]) if rs["current_day"] else None
+        e.rm.day_blocked, e.rm.halted = rs["day_blocked"], rs["halted"]
+        return e
+
+
+def run_legs(legs: list[Leg], engine: Engine, close_at_end: bool = True,
+             after: pd.Timestamp | None = None) -> Engine:
+    """Drive the engine over the union of all legs' bar times (optionally only times > after)."""
+    if not legs:
+        return engine
+    all_times = legs[0].times
+    for leg in legs[1:]:
+        all_times = all_times.union(leg.times)
+    if after is not None:
+        all_times = all_times[all_times > after]
+    idx = [leg.times.get_indexer(all_times) for leg in legs]
+    last_rows: dict[str, tuple[Leg, int]] = {}
+    for k, t in enumerate(all_times):
+        rows = [(leg, int(ix[k])) for leg, ix in zip(legs, idx) if ix[k] >= 0]
+        for r in rows:
+            last_rows[r[0].inst.symbol] = r
+        engine.step(t, rows)
+    if close_at_end:
+        engine.close_all(list(last_rows.values()))
+    return engine
 
 
 def run_backtest(
@@ -70,110 +380,23 @@ def run_backtest(
     risk: RiskConfig | None = None,
     usd_quote_rate: float | pd.Series | None = None,
     strategy_name: str = "",
+    funding: pd.Series | None = None,
+    financing: bool = True,
 ) -> BacktestResult:
+    """Single instrument, single strategy."""
     risk = risk or RiskConfig()
-    rm = RiskManager.start(risk, initial_equity)
-    o, h, l, c = (bars[k].to_numpy() for k in ("open", "high", "low", "close"))
-    times = bars.index
-    days = times.normalize()
-    entry_sig = signals["entry"].to_numpy()
-    exit_l = signals["exit_long"].to_numpy()
-    exit_s = signals["exit_short"].to_numpy()
-    stop_d = signals["stop_dist"].to_numpy()
-    tgt_d = signals["target_dist"].to_numpy()
-    if isinstance(usd_quote_rate, pd.Series):
-        fx_arr = usd_quote_rate.reindex(times, method="ffill").to_numpy()
-    else:
-        fx_arr = np.full(len(bars), usd_quote_rate if usd_quote_rate is not None else np.nan)
+    leg = Leg.build(inst, bars, signals, funding, financing, usd_quote_rate)
+    eng = Engine(risk, initial_equity, usdjpy=np.nan)
+    run_legs([leg], eng)
+    return BacktestResult(inst.symbol, strategy_name, eng.trades, eng.equity_series(),
+                          initial_equity, eng.rm.events)
 
-    half = inst.spread / 2 + inst.slippage
-    cash = initial_equity
-    pos: Trade | None = None
-    trades: list[Trade] = []
-    equity = np.empty(len(bars))
-    pending_exit = False
-    pending_entry: tuple[int, float, float] | None = None
 
-    def q2u(i: int, price: float) -> float:
-        fx = fx_arr[i]
-        return _quote_to_usd(inst, price, None if np.isnan(fx) else fx)
-
-    def commission(qty: float, price: float, i: int) -> float:
-        return inst.commission_per_qty * qty + inst.commission_pct * qty * price * inst.multiplier * q2u(i, price)
-
-    def close_pos(i: int, raw_price: float, reason: str, already_filled: bool = False) -> None:
-        nonlocal cash, pos
-        assert pos is not None
-        fill = raw_price if already_filled else raw_price - pos.direction * half
-        gross = (fill - pos.entry_price) * pos.direction * pos.qty * inst.multiplier * q2u(i, fill)
-        cost = commission(pos.qty, fill, i)
-        pos.pnl += gross - cost
-        cash += gross - cost
-        pos.exit_time, pos.exit_price, pos.exit_reason = times[i], fill, reason
-        trades.append(pos)
-        pos = None
-
-    def mark(i: int, price: float) -> float:
-        if pos is None:
-            return cash
-        return cash + (price - pos.entry_price) * pos.direction * pos.qty * inst.multiplier * q2u(i, price)
-
-    for i in range(len(bars)):
-        rm.on_new_day(days[i], mark(i, o[i]))
-
-        # 1) actions decided at the previous close, filled at this open
-        if pending_exit and pos is not None:
-            close_pos(i, o[i], "signal")
-        pending_exit = False
-        if pending_entry and pos is None and rm.can_open():
-            d, sd, td = pending_entry
-            fill = o[i] + d * half
-            qty = position_size(inst, cash, fill, sd, risk.risk_per_trade, q2u(i, fill))
-            if qty > 0:
-                cost = commission(qty, fill, i)
-                cash -= cost
-                pos = Trade(
-                    inst.symbol, d, qty, times[i], fill,
-                    stop=fill - d * sd,
-                    target=fill + d * td if not np.isnan(td) else np.nan,
-                    risk_usd=sd * qty * inst.multiplier * q2u(i, fill),
-                    pnl=-cost,
-                )
-        pending_entry = None
-
-        # 2) intrabar stop / target
-        if pos is not None:
-            d = pos.direction
-            stop_hit = (l[i] <= pos.stop) if d == 1 else (h[i] >= pos.stop)
-            tgt_hit = not np.isnan(pos.target) and ((h[i] >= pos.target) if d == 1 else (l[i] <= pos.target))
-            if stop_hit:
-                gapped = (o[i] <= pos.stop) if d == 1 else (o[i] >= pos.stop)
-                close_pos(i, o[i] if gapped else pos.stop, "stop")
-            elif tgt_hit:
-                gapped = (o[i] >= pos.target) if d == 1 else (o[i] <= pos.target)
-                close_pos(i, o[i] if gapped else pos.target, "target")
-
-        # 3) end of bar: risk checks, then read signals for the next open
-        equity[i] = mark(i, c[i])
-        if rm.update(equity[i], times[i]) and pos is not None:
-            pending_exit = True
-        if pos is not None and ((pos.direction == 1 and exit_l[i]) or (pos.direction == -1 and exit_s[i])):
-            pending_exit = True
-        e = entry_sig[i]
-        if e != 0 and not np.isnan(stop_d[i]) and (pos is None or pending_exit or pos.direction != e):
-            if pos is not None and pos.direction != e:
-                pending_exit = True  # reverse
-            pending_entry = (int(e), float(stop_d[i]), float(tgt_d[i]))
-
-    if pos is not None:
-        close_pos(len(bars) - 1, c[-1], "end")
-        equity[-1] = cash
-
-    return BacktestResult(
-        symbol=inst.symbol,
-        strategy=strategy_name,
-        trades=trades,
-        equity=pd.Series(equity, index=times, name="equity"),
-        initial_equity=initial_equity,
-        risk_events=rm.events,
-    )
+def run_portfolio(
+    legs: list[Leg], initial_equity: float = 100_000.0, risk: RiskConfig | None = None,
+    usdjpy: float = 150.0,
+) -> BacktestResult:
+    eng = Engine(risk or RiskConfig(), initial_equity, usdjpy=usdjpy)
+    run_legs(legs, eng)
+    return BacktestResult("PORTFOLIO", "+".join(sorted({l.inst.symbol for l in legs})),
+                          eng.trades, eng.equity_series(), initial_equity, eng.rm.events)

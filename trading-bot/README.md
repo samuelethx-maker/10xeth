@@ -12,6 +12,7 @@ using the acceptance gates below, before any paper trading.
 ```bash
 cd trading-bot
 uv sync                      # or: pip install -e . pytest
+uv sync --extra live         # adds yfinance (Yahoo data + paper trading)
 uv sync --extra ibkr         # adds ib_async for ES via IBKR
 uv run pytest
 ```
@@ -21,10 +22,14 @@ uv run pytest
 ```bash
 uv run tradingbot instruments                        # specs, cost assumptions
 uv run tradingbot backtest --all --synthetic          # pipeline smoke test (meaningless P&L)
-uv run tradingbot download --symbol BTCUSDT           # public data, no key needed
-uv run tradingbot download --all                      # OANDA needs keys, ES needs TWS running
+uv run tradingbot download --symbol BTCUSDT           # Binance public data + funding history, no key
+uv run tradingbot download --all --source yahoo       # ~2y of 1h for FX, metals, indices, ES (no key)
+uv run tradingbot download --all --source yahoo --interval 1d   # 20+ years daily
+uv run tradingbot download --symbol XAUUSD --source dukascopy   # long 1h CFD history (slow, rate-limited)
 uv run tradingbot backtest --symbol BTCUSDT --data data/BTCUSDT_1h.csv --trades-out results
 uv run tradingbot walkforward --symbol BTCUSDT --timeframe 4h --out results/wf   # out-of-sample only
+uv run tradingbot portfolio --timeframe 4h            # all instruments, one account, shared risk
+uv run tradingbot paper                               # one paper-trading tick (cron), or --loop
 ```
 
 Research results and decisions are logged in [RESEARCH.md](RESEARCH.md).
@@ -46,11 +51,23 @@ Every order must have a protective stop; adapters reject orders without one.
 $2,000–3,000 per contract, so a $100k account risking 0.75% can rarely take an ES
 trade. Micro E-mini (`MES`, $5/point) is included for the same exposure in smaller units.
 
+## Simulated paper trading (no broker keys)
+
+`tradingbot paper` pulls live free prices (Binance for crypto, Yahoo for everything else) and runs
+the same `Engine` as the backtests with simulated fills. Every 90 days it re-fits each market's
+parameters on the last year, using exactly the walk-forward selection rule. State is persisted in
+`results/paper/state.json`, so each tick picks up where the last stopped. `results/paper/report.md`
+shows equity, today's P&L, drawdown, open positions and trades. Configure it in `config/paper.yaml`. Run
+`tradingbot paper --loop` on an always-on machine, or with cron: `15 */4 * * * cd trading-bot && uv run tradingbot paper`.
+
+Tests check that a run interrupted and resumed through the saved state produces exactly the same trades as an uninterrupted run.
+
 ## Risk rules (`config/settings.yaml`)
 
 - 0.75% of equity risked per trade (stop distance x size), capped by max leverage
 - Daily loss limit of 3% from the day's starting equity: flatten and no new entries until the next UTC day
-- Max drawdown of 20% from peak: halt
+- Max drawdown of 20% from peak: halt (permanent until a human resets it)
+- Portfolio: at most 4 open positions, and at most 2 per correlated group (crypto, US indices, metals, JPY)
 - Kill switch: create a file `trading-bot/KILL_SWITCH` to block all new entries
 
 ## Backtest model
@@ -58,8 +75,10 @@ trade. Micro E-mini (`MES`, $5/point) is included for the same exposure in small
 Signals are taken on the bar close and filled at the next bar's open. Fills pay half
 the spread plus slippage, and commission is charged per side. Stops and targets are
 checked against the bar's high/low; when both are touched in one bar, the stop fills
-first, and a gap through the stop fills at the open. Cost figures in `instruments.py`
-are estimates; replace them with real demo-account spreads.
+first, and a gap through the stop fills at the open. Financing is charged for the time held:
+real Binance funding for crypto, and estimated swap rates for CFDs. Cost figures in `instruments.py`
+are estimates; replace them with real demo-account spreads. Single-instrument backtests,
+portfolio backtests and paper trading all run on the same `Engine`.
 
 ## Acceptance gates (per strategy, out-of-sample, after costs)
 
@@ -75,8 +94,9 @@ tradingbot/
   indicators.py    causal indicators (EMA, ATR, Donchian, Bollinger, RSI)
   strategies/      trend breakout, mean reversion, EMA momentum (Strategy interface)
   walkforward.py   rolling train/test optimisation, robustness diagnostics, resampling
+  paper.py         simulated paper trader (live free data, persisted state, report)
   risk.py          position sizing, daily loss / drawdown limits, kill switch
-  backtest.py      bar-by-bar engine
+  backtest.py      Engine (shared by backtest / portfolio / paper), financing
   metrics.py       stats + acceptance gates
   brokers/         paper, oanda, binance, ibkr adapters
 ```
@@ -84,8 +104,8 @@ tradingbot/
 ## Roadmap
 
 1. ✅ Engine, risk, backtester, broker adapters, baseline strategies
-2. Get data for all 9 instruments (OANDA practice key, IBKR paper + TWS)
-3. ✅ Walk-forward optimisation + robustness diagnostics; crypto research done (see RESEARCH.md)
-   ⏳ Validate the 4h trend candidate on OANDA instruments and ES; model funding; portfolio backtest
-4. Live paper runner (scheduler, reconciliation, daily report, alerts)
+2. ✅ Data for all 9 instruments from free sources (Binance, Yahoo; Dukascopy optional)
+3. ✅ Walk-forward, financing, portfolio backtest. **Result: no strategy passes the gates across
+   the 9 markets** (see RESEARCH.md). ⏳ Further strategy research.
+4. ✅ Simulated paper trader. ⏳ Broker order paths (OANDA / Binance testnet / IBKR) need accounts.
 5. 4–8 weeks of paper trading, then compare against the backtest

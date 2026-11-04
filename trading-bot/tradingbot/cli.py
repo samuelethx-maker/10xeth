@@ -4,6 +4,8 @@
   tradingbot backtest --all --synthetic          # smoke test the pipeline, no data needed
   tradingbot download --symbol BTCUSDT --days 1095
   tradingbot walkforward --symbol BTCUSDT --timeframe 4h --strategy all
+  tradingbot portfolio --strategy trend --timeframe 4h
+  tradingbot paper [--loop]                       # simulated paper trading, no keys
   tradingbot instruments
 """
 
@@ -14,11 +16,13 @@ import sys
 from pathlib import Path
 
 from . import data, metrics
-from .backtest import run_backtest
+import pandas as pd
+
+from .backtest import Leg, run_backtest, run_portfolio
 from .instruments import INSTRUMENTS, get_instrument
 from .risk import RiskConfig
 from .strategies import STRATEGIES
-from .walkforward import resample, walk_forward
+from .walkforward import bars_per_day, resample, stitched_signals, walk_forward
 
 DEFAULT_PRICES = {"GBPJPY": 190, "USDJPY": 150, "XAUUSD": 2000, "XAGUSD": 25, "NAS100USD": 16000,
                   "US30": 38000, "BTCUSDT": 40000, "ETHUSDT": 2500, "ES": 5000, "MES": 5000}
@@ -70,23 +74,54 @@ def cmd_backtest(args) -> int:
     return 0
 
 
-def cmd_walkforward(args) -> int:
+def _research_bars(sym: str, args):
+    """Bars for walk-forward / portfolio research at args.timeframe."""
+    if args.synthetic:
+        return data.synthetic(n_bars=args.bars, start_price=DEFAULT_PRICES.get(sym, 100),
+                              seed=sum(map(ord, sym)))
+    interval = "1d" if args.timeframe == "1D" else "1h"
+    bars = data.load_symbol(sym, args.source, interval)
+    if bars is None:
+        print(f"[skip] {sym}: no {interval} data (run `tradingbot download --symbol {sym}`)")
+        return None
+    if args.timeframe not in ("1h", "1D"):
+        bars = resample(bars, args.timeframe)
+    return bars
+
+
+def _wf(sym, args, risk):
+    inst = get_instrument(sym)
+    bars = _research_bars(sym, args)
+    if bars is None:
+        return None, None, None
+    bpd = bars_per_day(bars)
+    funding = data.load_funding(inst.symbol) if args.financing else None
+    out = {}
+    for sname in (list(STRATEGIES) if args.strategy == "all" else [args.strategy]):
+        out[sname] = walk_forward(
+            bars, inst, sname, int(args.train_days * bpd), int(args.test_days * bpd), risk=risk,
+            equity=args.equity, long_only=args.long_only, usd_quote_rate=args.usdjpy,
+            funding=funding, financing=args.financing,
+        )
+    return inst, bars, out
+
+
+def _risk(args) -> RiskConfig:
     risk = RiskConfig.load(args.config)
-    symbols = list(INSTRUMENTS) if args.all else [get_instrument(args.symbol).symbol]
-    strategies = list(STRATEGIES) if args.strategy == "all" else [args.strategy]
-    bars_per_day = {"1h": 24, "4h": 6, "1D": 1}[args.timeframe]
+    if getattr(args, "max_dd", None) is not None:
+        risk.max_drawdown = args.max_dd
+    return risk
+
+
+def cmd_walkforward(args) -> int:
+    risk = _risk(args)
+    symbols = list(INSTRUMENTS) if args.all else [get_instrument(s).symbol for s in args.symbol.split(",")]
     rows = []
     for sym in symbols:
-        inst = get_instrument(sym)
-        bars = _bars_for(sym, args)
-        if bars is None:
+        inst, bars, results = _wf(sym, args, risk)
+        if results is None:
             continue
-        if args.timeframe != "1h":
-            bars = resample(bars, args.timeframe)
-        train, test = int(args.train_days * bars_per_day), int(args.test_days * bars_per_day)
-        for sname in strategies:
-            wf = walk_forward(bars, inst, sname, train, test, risk=risk, equity=args.equity,
-                              long_only=args.long_only, usd_quote_rate=args.usdjpy)
+        for sname, wf in results.items():
             if not wf.folds:
                 print(f"[skip] {sym} {sname}: not enough history for one fold")
                 continue
@@ -111,8 +146,76 @@ def cmd_walkforward(args) -> int:
     if args.synthetic:
         print("NOTE: synthetic random-walk data - these numbers only prove the pipeline runs.\n")
     print(metrics.format_table(rows))
-    print(f"\nOut-of-sample only (stitched test windows). Acceptance: PF>{metrics.ACCEPTANCE['profit_factor']}, "
+    print(f"\nOut-of-sample only (stitched test windows), incl. financing={args.financing}. "
+          f"Acceptance: PF>{metrics.ACCEPTANCE['profit_factor']}, "
           f"maxDD<{metrics.ACCEPTANCE['max_drawdown']:.0%}, trades>={metrics.ACCEPTANCE['min_trades']}")
+    return 0
+
+
+def cmd_portfolio(args) -> int:
+    """Walk-forward each instrument, then trade all stitched out-of-sample signals
+    together through one account with shared risk limits."""
+    risk = _risk(args)
+    symbols = [get_instrument(s).symbol for s in args.symbols.split(",")] if args.symbols != "all" \
+        else [s for s in INSTRUMENTS if s != ("ES" if args.micro else "MES")]
+    legs = []
+    for sym in symbols:
+        inst, bars, results = _wf(sym, args, risk)
+        if results is None or not results[args.strategy].folds:
+            continue
+        sig = stitched_signals(bars, results[args.strategy], args.long_only)
+        b = bars.loc[sig.index]
+        if args.since:
+            keep = b.index >= pd.Timestamp(args.since, tz="UTC")
+            b, sig = b[keep], sig[keep]
+        if len(b) == 0:
+            continue
+        funding = data.load_funding(inst.symbol) if args.financing else None
+        legs.append(Leg.build(inst, b, sig, funding, args.financing))
+        print(f"[leg] {sym}: OOS {b.index[0].date()} -> {b.index[-1].date()} ({len(b)} bars)")
+    res = run_portfolio(legs, args.equity, risk, args.usdjpy)
+    m = metrics.compute(res)
+    m["segment"] = f"portfolio {args.timeframe}{' L' if args.long_only else ''}"
+    m["accepted"] = all(metrics.acceptance(m).values())
+    print()
+    print(metrics.format_table([m]))
+    tf = res.trades_frame()
+    if len(tf):
+        by = tf.groupby("symbol").agg(trades=("pnl", "size"), net_pnl=("pnl", "sum"),
+                                      financing=("financing", "sum"), avg_r=("r_multiple", "mean"))
+        print("\nContribution by instrument:")
+        print(by.round(2).to_string())
+        yearly = res.equity.resample("YE").last()
+        yearly = pd.concat([pd.Series([res.initial_equity], index=[yearly.index[0] - pd.offsets.YearEnd()]), yearly])
+        print("\nReturn by calendar year (%):")
+        print((yearly.pct_change().dropna() * 100).round(1).rename(lambda t: t.year).to_string())
+        print(f"\nRisk events: {len(res.risk_events)} "
+              f"(daily-limit days: {m['days_blocked']}, halted: {m['halted']})")
+    if args.out:
+        out = Path(args.out)
+        out.mkdir(parents=True, exist_ok=True)
+        tag = f"portfolio_{args.strategy}_{args.timeframe}{'_long' if args.long_only else ''}"
+        tf.to_csv(out / f"{tag}_trades.csv", index=False)
+        res.equity.to_csv(out / f"{tag}_equity.csv")
+    return 0
+
+
+def cmd_paper(args) -> int:
+    from .paper import PaperConfig, PaperTrader
+
+    cfg = PaperConfig.load(args.config)
+    if args.reset and cfg.dir.exists():
+        for f in cfg.dir.glob("*"):
+            f.unlink()
+        print(f"reset {cfg.dir}")
+    pt = PaperTrader(cfg)
+    if args.loop:
+        pt.loop()
+        return 0
+    s = pt.tick()
+    print(f"[tick] new bars {s['new_bars']}, closed trades {s['closed_trades']}, "
+          f"equity ${s['equity']:,.2f}, open {s['open']}, pending {s['pending']}")
+    print(f"report: {cfg.dir / 'report.md'}")
     return 0
 
 
@@ -120,12 +223,19 @@ def cmd_download(args) -> int:
     symbols = list(INSTRUMENTS) if args.all else [args.symbol]
     for sym in symbols:
         inst = get_instrument(sym)
+        if inst.symbol == "MES":
+            continue  # shares ES history
         try:
-            df = data.download(inst, days=args.days)
+            df = data.download(inst, days=args.days, source=args.source, interval=args.interval)
+            if args.funding and inst.broker == "binance":
+                f = data.download_funding(inst.broker_symbol)
+                f.rename_axis("time").to_csv(data.DATA_DIR / f"{inst.symbol}_funding.csv")
+                print(f"[ok] {inst.symbol}: {len(f)} funding events")
         except Exception as e:  # keep going for --all
             print(f"[fail] {inst.symbol}: {e}")
             continue
-        out = data.DATA_DIR / f"{inst.symbol}_1h.csv"
+        src = args.source if args.source not in ("auto", "binance", "dukascopy") else ""
+        out = data.data_path(inst.symbol, src, args.interval)
         data.save_csv(df, out)
         print(f"[ok] {inst.symbol}: {len(df)} bars {df.index[0]} -> {df.index[-1]} -> {out}")
     return 0
@@ -156,27 +266,53 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--trades-out", help="directory for out-of-sample trade logs")
     b.set_defaults(fn=cmd_backtest)
 
+    def research_args(sp, strategy_default="all"):
+        sp.add_argument("--strategy", default=strategy_default,
+                        choices=(["all"] if strategy_default == "all" else []) + list(STRATEGIES))
+        sp.add_argument("--timeframe", default="4h", choices=["1h", "4h", "1D"])
+        sp.add_argument("--train-days", type=float, default=365)
+        sp.add_argument("--test-days", type=float, default=90)
+        sp.add_argument("--long-only", action="store_true")
+        sp.add_argument("--source", default="", help="data file source suffix, e.g. yahoo (default: auto)")
+        sp.add_argument("--no-financing", dest="financing", action="store_false")
+        sp.add_argument("--synthetic", action="store_true")
+        sp.add_argument("--bars", type=int, default=20_000)
+        sp.add_argument("--equity", type=float, default=100_000)
+        sp.add_argument("--usdjpy", type=float, default=150.0)
+        sp.add_argument("--config", default=str(Path(__file__).resolve().parent.parent / "config" / "settings.yaml"))
+        sp.add_argument("--out", help="directory for CSV outputs")
+        sp.add_argument("--max-dd", type=float,
+                        help="override the max-drawdown halt (research only, e.g. 1.0 = never halt)")
+
     w = sub.add_parser("walkforward", help="walk-forward optimisation (out-of-sample only)")
-    w.add_argument("--symbol", default="BTCUSDT")
+    w.add_argument("--symbol", default="BTCUSDT", help="one or more, comma separated")
     w.add_argument("--all", action="store_true")
-    w.add_argument("--strategy", default="all", choices=["all", *STRATEGIES])
-    w.add_argument("--timeframe", default="4h", choices=["1h", "4h", "1D"])
-    w.add_argument("--train-days", type=float, default=365)
-    w.add_argument("--test-days", type=float, default=90)
-    w.add_argument("--long-only", action="store_true")
-    w.add_argument("--data")
-    w.add_argument("--synthetic", action="store_true")
-    w.add_argument("--bars", type=int, default=20_000)
-    w.add_argument("--equity", type=float, default=100_000)
-    w.add_argument("--usdjpy", type=float, default=150.0)
-    w.add_argument("--config", default=str(Path(__file__).resolve().parent.parent / "config" / "settings.yaml"))
-    w.add_argument("--out", help="directory for fold / trade / equity CSVs")
+    research_args(w)
     w.set_defaults(fn=cmd_walkforward)
+
+    pf = sub.add_parser("portfolio", help="out-of-sample portfolio backtest with shared risk")
+    pf.add_argument("--symbols", default="all", help="comma separated, or all")
+    pf.add_argument("--micro", action=argparse.BooleanOptionalAction, default=True,
+                    help="use MES instead of ES in 'all' (default on; ES rarely fits 0.75%% risk under ~$500k)")
+    pf.add_argument("--since", help="only trade OOS bars from this date (common window)")
+    research_args(pf, "trend")
+    pf.set_defaults(fn=cmd_portfolio)
+
+    pp = sub.add_parser("paper", help="simulated paper trading on live free prices")
+    pp.add_argument("--config", default=str(Path(__file__).resolve().parent.parent / "config" / "paper.yaml"))
+    pp.add_argument("--loop", action="store_true", help="run forever, one tick per bar")
+    pp.add_argument("--reset", action="store_true", help="wipe paper state first")
+    pp.set_defaults(fn=cmd_paper)
 
     d = sub.add_parser("download")
     d.add_argument("--symbol", default="BTCUSDT")
     d.add_argument("--all", action="store_true")
     d.add_argument("--days", type=int, default=3 * 365)
+    d.add_argument("--source", default="auto", choices=["auto", "binance", "dukascopy", "yahoo", "oanda", "ibkr"],
+                   help="auto = Binance for crypto, Dukascopy for everything else")
+    d.add_argument("--interval", default="1h", choices=["1h", "1d"])
+    d.add_argument("--no-funding", dest="funding", action="store_false",
+                   help="skip Binance funding-rate history for crypto")
     d.set_defaults(fn=cmd_download)
 
     sub.add_parser("instruments").set_defaults(fn=cmd_instruments)

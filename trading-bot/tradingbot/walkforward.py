@@ -35,6 +35,51 @@ GRIDS: dict[str, dict[str, list]] = {
 }
 
 
+def select_params(
+    bars: pd.DataFrame,
+    tr: slice,
+    inst: Instrument,
+    signals: list[pd.DataFrame],
+    combos: list[dict],
+    grid: dict[str, list],
+    risk: RiskConfig | None = None,
+    equity: float = 100_000.0,
+    min_train_trades: int = 15,
+    usd_quote_rate: float | None = None,
+    funding: pd.Series | None = None,
+    financing: bool = True,
+) -> dict:
+    """Backtest every combo on the training window; pick the best by score.
+    Shared by the walk-forward and the paper trader's periodic refit."""
+    ms = [
+        metrics.compute(run_backtest(bars.iloc[tr], s.iloc[tr], inst, equity, risk,
+                                     usd_quote_rate=usd_quote_rate, funding=funding,
+                                     financing=financing))
+        for s in signals
+    ]
+    scores = np.array([score(m, min_train_trades) for m in ms])
+    plateau = float(np.mean([m["profit_factor"] > 1 and m["trades"] >= min_train_trades for m in ms]))
+    best = int(np.argmax(scores))
+    return {
+        "best": best if np.isfinite(scores[best]) else None,
+        "params": combos[best] if np.isfinite(scores[best]) else None,
+        "score": float(scores[best]),
+        "scores": scores,
+        "plateau": plateau,
+    }
+
+
+def strategy_signals(strategy: str, combos: list[dict], bars: pd.DataFrame, long_only: bool) -> list[pd.DataFrame]:
+    cls = STRATEGIES[strategy]
+    out = []
+    for c in combos:
+        s = cls(**c).generate(bars)
+        if long_only:
+            s.loc[s["entry"] < 0, "entry"] = 0
+        out.append(s)
+    return out
+
+
 def resample(bars: pd.DataFrame, rule: str) -> pd.DataFrame:
     """Aggregate OHLCV to a coarser timeframe (e.g. '4h', '1D')."""
     out = bars.resample(rule, label="left", closed="left").agg(
@@ -104,18 +149,14 @@ def walk_forward(
     long_only: bool = False,
     min_train_trades: int = 15,
     usd_quote_rate: float | None = None,
+    funding: pd.Series | None = None,
+    financing: bool = True,
 ) -> WalkForwardResult:
     grid = grid or GRIDS[strategy]
     combos = _grid(grid)
-    cls = STRATEGIES[strategy]
     # Indicators are causal, so signals over the full history equal signals computed
     # fold by fold - generate once per combo.
-    signals = []
-    for c in combos:
-        s = cls(**c).generate(bars)
-        if long_only:
-            s.loc[s["entry"] < 0, "entry"] = 0
-        signals.append(s)
+    signals = strategy_signals(strategy, combos, bars, long_only)
 
     folds: list[Fold] = []
     oos_trades: list[Trade] = []
@@ -124,15 +165,10 @@ def walk_forward(
     start = 0
     while start + train + test <= len(bars):
         tr, te = slice(start, start + train), slice(start + train, start + train + test)
-        ms = [
-            metrics.compute(run_backtest(bars.iloc[tr], s.iloc[tr], inst, equity, risk,
-                                         usd_quote_rate=usd_quote_rate))
-            for s in signals
-        ]
-        scores = np.array([score(m, min_train_trades) for m in ms])
-        plateau = float(np.mean([m["profit_factor"] > 1 and m["trades"] >= min_train_trades for m in ms]))
-        best = int(np.argmax(scores))
-        if not np.isfinite(scores[best]):
+        sel = select_params(bars, tr, inst, signals, combos, grid, risk, equity, min_train_trades,
+                            usd_quote_rate, funding, financing)
+        best, plateau = sel["best"], sel["plateau"]
+        if best is None:
             # Nothing tradable in training: sit this fold out (flat equity).
             flat = pd.Series(cur_equity, index=bars.index[te], name="equity")
             oos_equity.append(flat)
@@ -140,8 +176,10 @@ def walk_forward(
                               -np.inf, plateau, 0.0, 0.0, 0))
             start += test
             continue
+        scores = sel["scores"]
         res = run_backtest(bars.iloc[te], signals[best].iloc[te], inst, cur_equity, risk,
-                           usd_quote_rate=usd_quote_rate, strategy_name=strategy)
+                           usd_quote_rate=usd_quote_rate, strategy_name=strategy,
+                           funding=funding, financing=financing)
         oos_trades.extend(res.trades)
         oos_equity.append(res.equity)
         folds.append(Fold(
@@ -156,3 +194,31 @@ def walk_forward(
     eq = pd.concat(oos_equity) if oos_equity else pd.Series(dtype=float, name="equity")
     oos = BacktestResult(inst.symbol, strategy, oos_trades, eq, equity)
     return WalkForwardResult(inst.symbol, strategy, folds, oos)
+
+
+def stitched_signals(bars: pd.DataFrame, wf: WalkForwardResult, long_only: bool = False) -> pd.DataFrame:
+    """Out-of-sample signal series: each test window uses the params chosen on the
+    preceding training window. Folds with no tradable params only emit exits."""
+    cls = STRATEGIES[wf.strategy]
+    cache: dict[tuple, pd.DataFrame] = {}
+    parts = []
+    for f in wf.folds:
+        window = bars.loc[f.test_start:f.test_end]
+        if f.params:
+            key = tuple(sorted(f.params.items()))
+            if key not in cache:
+                s = cls(**f.params).generate(bars)
+                if long_only:
+                    s.loc[s["entry"] < 0, "entry"] = 0
+                cache[key] = s
+            parts.append(cache[key].loc[window.index])
+        else:
+            s = cls.empty_signals(window.index)
+            s["exit_long"] = s["exit_short"] = True
+            parts.append(s)
+    return pd.concat(parts) if parts else cls.empty_signals(bars.index[:0])
+
+
+def bars_per_day(bars: pd.DataFrame) -> float:
+    days = (bars.index[-1] - bars.index[0]).total_seconds() / 86400
+    return len(bars) / max(days, 1.0)

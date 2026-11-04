@@ -17,7 +17,8 @@ class RiskConfig:
     risk_per_trade: float = 0.0075  # fraction of equity risked per trade
     daily_loss_limit: float = 0.03  # flatten + stop for the day at -3% from day start
     max_drawdown: float = 0.20  # hard stop from equity peak
-    max_open_positions: int = 4  # across all instruments (live runner)
+    max_open_positions: int = 4  # across all instruments
+    max_per_group: int = 2  # e.g. at most 2 of NAS100/US30/ES, 2 of BTC/ETH
 
     @classmethod
     def load(cls, path: str | Path | None) -> RiskConfig:

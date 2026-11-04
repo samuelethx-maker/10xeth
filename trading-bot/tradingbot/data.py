@@ -6,7 +6,10 @@ open, high, low, close, volume.
 
 from __future__ import annotations
 
+import lzma
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +32,28 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
     df = df[~df.index.duplicated(keep="last")]
     if df.index.tz is None:
         df.index = df.index.tz_localize("UTC")
-    return df.dropna()
+    df = df.dropna()
+    df = df[(df[["open", "high", "low", "close"]] > 0).all(axis=1)]
+    # Yahoo daily history sometimes has highs/lows that don't contain open/close.
+    df["high"] = df[["open", "high", "close"]].max(axis=1)
+    df["low"] = df[["open", "low", "close"]].min(axis=1)
+    return df
+
+
+def data_path(symbol: str, source: str = "", interval: str = "1h") -> Path:
+    suffix = f"_{source}" if source else ""
+    return DATA_DIR / f"{symbol}{suffix}_{interval}.csv"
+
+
+def load_symbol(symbol: str, source: str = "", interval: str = "1h") -> pd.DataFrame | None:
+    """Load cached bars. Without an explicit source, the default file (Binance for
+    crypto, Dukascopy otherwise) is tried first, then Yahoo. MES shares ES history."""
+    for sym in (symbol, "ES") if symbol == "MES" else (symbol,):
+        for src in [source] if source else ["", "yahoo"]:
+            p = data_path(sym, src, interval)
+            if p.exists():
+                return load_csv(p)
+    return None
 
 
 def load_csv(path: str | Path) -> pd.DataFrame:
@@ -130,14 +154,134 @@ def download_oanda(instrument: str, granularity: str = "H1", days: int = 365) ->
     return validate(df)
 
 
-def download(inst: Instrument, days: int = 365) -> pd.DataFrame:
-    if inst.broker == "binance":
-        return download_binance(inst.broker_symbol, "1h", days)
-    if inst.broker == "oanda":
+_DUKA_DTYPE = np.dtype([("t", ">u4"), ("o", ">i4"), ("c", ">i4"), ("l", ">i4"), ("h", ">i4"), ("v", ">f4")])
+_UA = {"User-Agent": "Mozilla/5.0 (tradingbot research)"}
+
+
+def _duka_fetch(symbol: str, period: pd.Period) -> bytes | None:
+    """Raw monthly hour-candle file; b"" = month exists but is empty, None = not published."""
+    # Months are 0-based in Dukascopy URLs.
+    url = (f"https://datafeed.dukascopy.com/datafeed/{symbol}/{period.year}/"
+           f"{period.month - 1:02d}/BID_candles_hour_1.bi5")
+    for attempt in range(8):
+        try:
+            r = requests.get(url, timeout=90, headers=_UA)
+            if r.status_code == 404:
+                return None
+            r.raise_for_status()
+            return r.content
+        except requests.RequestException:
+            if attempt == 7:
+                raise
+            time.sleep(min(60, 5 * 2 ** attempt))
+    return None
+
+
+def _duka_month(symbol: str, period: pd.Period, scale: float) -> pd.DataFrame | None:
+    cache = DATA_DIR / "cache" / "dukascopy" / symbol / f"{period}.bi5"
+    this_month = pd.Timestamp.now(tz="UTC").to_period("M")
+    if cache.exists() and period < this_month - 1:  # recent months may still change
+        content = cache.read_bytes()
+    else:
+        content = _duka_fetch(symbol, period)
+        if content is None:
+            return None
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_bytes(content)
+    if not content:
+        return None
+    a = np.frombuffer(lzma.decompress(content), dtype=_DUKA_DTYPE)
+
+    base = pd.Timestamp(period.year, period.month, 1, tz="UTC")
+    df = pd.DataFrame(
+        {"open": a["o"] / scale, "high": a["h"] / scale, "low": a["l"] / scale,
+         "close": a["c"] / scale, "volume": a["v"].astype(float)},
+        index=base + pd.to_timedelta(a["t"].astype(np.int64), unit="s"),
+    )
+    # Closed-market hours are emitted as flat zero-volume candles.
+    closed = (df["volume"] == 0) & (df["high"] == df["low"])
+    return df[~closed]
+
+
+def download_dukascopy(symbol: str, start: str = "2015-01", scale: float = 1000.0) -> pd.DataFrame:
+    """Free hourly BID candles from Dukascopy's public datafeed (no key needed).
+    The current month is usually not published yet."""
+    months = pd.period_range(start, pd.Timestamp.now(tz="UTC").strftime("%Y-%m"), freq="M")
+    # The feed throttles parallel requests hard; files are cached so reruns resume.
+    with ThreadPoolExecutor(2) as ex:
+        parts = [p for p in ex.map(lambda m: _duka_month(symbol, m, scale), months) if p is not None]
+    if not parts:
+        raise RuntimeError(f"no Dukascopy data for {symbol}")
+    return validate(pd.concat(parts))
+
+
+def download_yahoo(ticker: str, interval: str = "1h", period: str = "730d") -> pd.DataFrame:
+    """Yahoo Finance bars via yfinance (`uv sync --extra live`). Futures are the
+    continuous front month, not back-adjusted, so rolls show up as price jumps."""
+    try:
+        import yfinance as yf
+    except ImportError:
+        raise RuntimeError("yfinance not installed: uv sync --extra live") from None
+    df = yf.download(ticker, period=period, interval=interval, progress=False,
+                     auto_adjust=False, multi_level_index=False)
+    if df.empty:
+        raise RuntimeError(f"no Yahoo data for {ticker}")
+    df.columns = [c.lower() for c in df.columns]
+    df.index = pd.to_datetime(df.index, utc=True)
+    return validate(df)
+
+
+def download_funding(symbol: str, start: str = "2019-09-01") -> pd.Series:
+    """Binance USD-M funding-rate history (fraction per 8h event; longs pay when > 0)."""
+    base = os.environ.get("BINANCE_DATA_URL", "https://fapi.binance.com")
+    t = int(pd.Timestamp(start, tz="UTC").timestamp() * 1000)
+    rows = []
+    while True:
+        r = requests.get(f"{base}/fapi/v1/fundingRate",
+                         params={"symbol": symbol, "startTime": t, "limit": 1000}, timeout=30)
+        r.raise_for_status()
+        batch = r.json()
+        if not batch:
+            break
+        rows += [(b["fundingTime"], float(b["fundingRate"])) for b in batch]
+        t = batch[-1]["fundingTime"] + 1
+        if len(batch) < 1000:
+            break
+    s = pd.Series([v for _, v in rows], index=pd.to_datetime([k for k, _ in rows], unit="ms", utc=True),
+                  name="funding")
+    return s[~s.index.duplicated()]
+
+
+def load_funding(symbol: str) -> pd.Series | None:
+    p = DATA_DIR / f"{symbol}_funding.csv"
+    if not p.exists():
+        return None
+    df = pd.read_csv(p, index_col=0)
+    df.index = pd.to_datetime(df.index, utc=True)
+    return df["funding"]
+
+
+def download(inst: Instrument, days: int = 365, source: str = "auto", interval: str = "1h") -> pd.DataFrame:
+    if source == "auto":
+        source = "binance" if inst.broker == "binance" else "dukascopy"
+    if source == "binance":
+        return download_binance(inst.broker_symbol, interval, days)
+    if source == "dukascopy":
+        if not inst.dukascopy:
+            raise ValueError(f"{inst.symbol} has no Dukascopy symbol")
+        start = (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)).strftime("%Y-%m")
+        return download_dukascopy(inst.dukascopy, start)
+    if source == "yahoo":
+        if not inst.yahoo:
+            raise ValueError(f"{inst.symbol} has no Yahoo ticker")
+        if interval == "1d":
+            return download_yahoo(inst.yahoo, "1d", "max")
+        return download_yahoo(inst.yahoo, "1h", f"{min(days, 729)}d")
+    if source == "oanda":
         return download_oanda(inst.broker_symbol, "H1", days)
-    if inst.broker == "ibkr":
+    if source == "ibkr":
         from .brokers.ibkr import IBKRBroker
 
         with IBKRBroker.from_env() as b:
             return b.historical_bars(inst.symbol, days=days)
-    raise ValueError(f"no downloader for broker {inst.broker}")
+    raise ValueError(f"unknown data source {source!r}")
