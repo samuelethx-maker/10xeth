@@ -181,6 +181,9 @@ def cmd_portfolio(args) -> int:
     m["accepted"] = all(metrics.acceptance(m).values())
     print()
     print(metrics.format_table([m]))
+    lo, hi = metrics.bootstrap_pf([t.pnl for t in res.trades])
+    print(f"\nProfit factor 95% bootstrap CI: [{lo:.2f}, {hi:.2f}]"
+          f"{'  -> not distinguishable from break-even' if lo <= 1.0 else ''}")
     tf = res.trades_frame()
     if len(tf):
         by = tf.groupby("symbol").agg(trades=("pnl", "size"), net_pnl=("pnl", "sum"),
