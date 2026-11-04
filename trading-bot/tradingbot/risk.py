@@ -19,6 +19,7 @@ class RiskConfig:
     max_drawdown: float = 0.20  # hard stop from equity peak
     max_open_positions: int = 4  # across all instruments
     max_per_group: int = 2  # e.g. at most 2 of NAS100/US30/ES, 2 of BTC/ETH
+    max_gross_leverage: float = 5.0  # total open notional / equity, across all positions
 
     @classmethod
     def load(cls, path: str | Path | None) -> RiskConfig:
