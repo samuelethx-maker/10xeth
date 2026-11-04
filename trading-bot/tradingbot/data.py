@@ -309,14 +309,21 @@ def refresh(inst: Instrument, log=print) -> pd.DataFrame:
         p = data_path(sym)
         old = load_csv(p) if p.exists() else None
         days = 730 if old is None else max(2, (now - old.index[-1]).days + 2)
-        new = download_binance(inst.broker_symbol, "1h", days)
-        oldf = load_funding(sym)
-        fstart = (oldf.index[-1] if oldf is not None else now - pd.Timedelta(days=days)).strftime("%Y-%m-%d")
-        f = download_funding(inst.broker_symbol, fstart)
-        if oldf is not None:
-            f = pd.concat([oldf, f])
-            f = f[~f.index.duplicated(keep="last")].sort_index()
-        f.rename("funding").rename_axis("time").to_csv(DATA_DIR / f"{sym}_funding.csv")
+        try:
+            new = download_binance(inst.broker_symbol, "1h", days)
+        except requests.RequestException as e:
+            log(f"{sym}: Binance unavailable ({e}); using Yahoo {inst.yahoo}")
+            new = download_yahoo(inst.yahoo, "1h", f"{min(days, 729)}d")
+        try:
+            oldf = load_funding(sym)
+            fstart = (oldf.index[-1] if oldf is not None else now - pd.Timedelta(days=days)).strftime("%Y-%m-%d")
+            f = download_funding(inst.broker_symbol, fstart)
+            if oldf is not None:
+                f = pd.concat([oldf, f])
+                f = f[~f.index.duplicated(keep="last")].sort_index()
+            f.rename("funding").rename_axis("time").to_csv(DATA_DIR / f"{sym}_funding.csv")
+        except requests.RequestException as e:
+            log(f"{sym}: funding history unavailable ({e}); keeping cached funding")
     else:
         p = data_path(sym, "yahoo")
         old = load_csv(p) if p.exists() else None

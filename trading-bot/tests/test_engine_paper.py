@@ -204,3 +204,26 @@ def test_closed_bars_waits_for_lagging_feed():
     now = t0 + pd.Timedelta(hours=8, minutes=15)
     assert list(closed_bars(lagging, "4h", now).index) == [t0]
     assert list(closed_bars(lagging, "4h", now + pd.Timedelta(hours=7)).index) == [t0, t0 + pd.Timedelta(hours=4)]
+
+
+def test_fetch_live_falls_back_to_yahoo_when_binance_blocked(monkeypatch):
+    import requests
+
+    from tradingbot import paper
+
+    def blocked(*a, **k):
+        raise requests.HTTPError("451 Client Error: restricted location")
+
+    calls = {}
+
+    def yahoo(ticker, interval, period):
+        calls["ticker"] = ticker
+        return data.synthetic(10)
+
+    monkeypatch.setattr(paper.data, "download_binance", blocked)
+    monkeypatch.setattr(paper.data, "download_yahoo", yahoo)
+    monkeypatch.setattr(paper.data, "download_funding", blocked)
+    monkeypatch.setattr(paper.data, "load_funding", lambda sym: None)
+    inst = get_instrument("BTCUSDT")
+    assert len(paper.fetch_live(inst, 30)) == 10 and calls["ticker"] == "BTC-USD"
+    assert paper.fetch_funding(inst, pd.Timestamp("2024-01-01", tz="UTC")) is None

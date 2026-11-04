@@ -23,6 +23,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import requests
 import yaml
 
 from . import data
@@ -73,14 +74,23 @@ class PaperConfig:
 
 def fetch_live(inst: Instrument, days: int) -> pd.DataFrame:
     if inst.broker == "binance":
-        return data.download_binance(inst.broker_symbol, "1h", days)
+        try:
+            return data.download_binance(inst.broker_symbol, "1h", days)
+        except requests.RequestException:
+            # Binance blocks some regions (HTTP 451); Yahoo spot prices track the perp closely.
+            if not inst.yahoo:
+                raise
     return data.download_yahoo(inst.yahoo, "1h", f"{min(days, 729)}d")
 
 
 def fetch_funding(inst: Instrument, start: pd.Timestamp) -> pd.Series | None:
+    """Real funding history, or None (= estimated financing rate) if Binance is unreachable."""
     if inst.broker != "binance":
         return None
-    return data.download_funding(inst.broker_symbol, start.strftime("%Y-%m-%d"))
+    try:
+        return data.download_funding(inst.broker_symbol, start.strftime("%Y-%m-%d"))
+    except requests.RequestException:
+        return data.load_funding(inst.symbol)
 
 
 CLOSE_GRACE = pd.Timedelta(hours=6)

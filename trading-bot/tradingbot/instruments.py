@@ -71,8 +71,10 @@ INSTRUMENTS: dict[str, Instrument] = {
         Instrument("US30", "oanda", "US30_USD", "USD", 0.1, qty_step=0.1, min_qty=0.1,
                    spread=3.0, slippage=1.0, dukascopy="USA30IDXUSD", yahoo="YM=F", **_INDEX),
         # --- Binance USD-M futures testnet (allows shorting) ---
-        Instrument("BTCUSDT", "binance", "BTCUSDT", "USD", 0.1, spread=0.1, slippage=2.0, **_CRYPTO),
-        Instrument("ETHUSDT", "binance", "ETHUSDT", "USD", 0.01, spread=0.01, slippage=0.2, **_CRYPTO),
+        Instrument("BTCUSDT", "binance", "BTCUSDT", "USD", 0.1, spread=0.1, slippage=2.0,
+                   yahoo="BTC-USD", **_CRYPTO),
+        Instrument("ETHUSDT", "binance", "ETHUSDT", "USD", 0.01, spread=0.01, slippage=0.2,
+                   yahoo="ETH-USD", **_CRYPTO),
         # --- IBKR paper: CME E-mini S&P 500 futures (front month, rolled) ---
         # Research history uses Dukascopy's S&P 500 CFD as a proxy; live prices use ES=F.
         Instrument("ES", "ibkr", "ES", "USD", 0.25, multiplier=50.0, spread=0.25, slippage=0.25,
