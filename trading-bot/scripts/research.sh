@@ -20,6 +20,12 @@ case "${1:-A}" in
   D)
     uv run tradingbot portfolio --timeframe 1D --train-days 1095 --test-days 365 --max-dd 1.0 > $L/pf_1d_nohalt.txt 2>&1
     ;;
+  E)  # pre-registered "sit out when training score <= 0" rule
+    uv run tradingbot walkforward --all --timeframe 4h --strategy trend --min-score 0 > $L/wf_4h_sitout.txt 2>&1
+    uv run tradingbot portfolio --timeframe 4h --min-score 0 > $L/pf_4h_sitout.txt 2>&1
+    uv run tradingbot portfolio --timeframe 4h --min-score 0 --max-dd 1.0 > $L/pf_4h_sitout_nohalt.txt 2>&1
+    uv run tradingbot portfolio --timeframe 1D --train-days 1095 --test-days 365 --min-score 0 --max-dd 1.0 > $L/pf_1d_sitout_nohalt.txt 2>&1
+    ;;
   B)
     uv run tradingbot walkforward --all --timeframe 1D --train-days 1095 --test-days 365 --out results/wf1d > $L/wf_1d_all.txt 2>&1
     uv run tradingbot portfolio --timeframe 1D --train-days 1095 --test-days 365 --out results/pf > $L/pf_1d.txt 2>&1

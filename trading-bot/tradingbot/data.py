@@ -285,3 +285,30 @@ def download(inst: Instrument, days: int = 365, source: str = "auto", interval: 
         with IBKRBroker.from_env() as b:
             return b.historical_bars(inst.symbol, days=days)
     raise ValueError(f"unknown data source {source!r}")
+
+
+def refresh(inst: Instrument, log=print) -> pd.DataFrame:
+    """Incrementally update the cached 1h file used by replay / paper trading
+    (Binance for crypto, Yahoo otherwise; MES shares ES)."""
+    sym = "ES" if inst.symbol == "MES" else inst.symbol
+    now = pd.Timestamp.now(tz="UTC")
+    if inst.broker == "binance":
+        p = data_path(sym)
+        old = load_csv(p) if p.exists() else None
+        days = 730 if old is None else max(2, (now - old.index[-1]).days + 2)
+        new = download_binance(inst.broker_symbol, "1h", days)
+        oldf = load_funding(sym)
+        fstart = (oldf.index[-1] if oldf is not None else now - pd.Timedelta(days=days)).strftime("%Y-%m-%d")
+        f = download_funding(inst.broker_symbol, fstart)
+        if oldf is not None:
+            f = pd.concat([oldf, f])
+            f = f[~f.index.duplicated(keep="last")].sort_index()
+        f.rename("funding").rename_axis("time").to_csv(DATA_DIR / f"{sym}_funding.csv")
+    else:
+        p = data_path(sym, "yahoo")
+        old = load_csv(p) if p.exists() else None
+        new = download_yahoo(inst.yahoo if inst.symbol != "MES" else "ES=F", "1h", "729d")
+    df = new if old is None else validate(pd.concat([old, new]))
+    save_csv(df, p)
+    log(f"{sym}: {len(df)} bars, last {df.index[-1]:%Y-%m-%d %H:%M} UTC")
+    return df

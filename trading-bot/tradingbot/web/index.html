@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trading Bot — Demo</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel2: #1c2330; --line: #2a3340; --text: #e6edf3;
+    --muted: #8b98a8; --accent: #4c9aff; --green: #3fb950; --red: #f85149; --amber: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+           padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+  h1 { font-size: 18px; margin: 0; }
+  h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
+  h2 { font-size: 15px; margin: 22px 0 10px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px 20px 60px; }
+  nav { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; overflow-x: auto; }
+  nav button { background: none; border: none; color: var(--muted); padding: 10px 14px; font: inherit; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+  nav button.active { color: var(--text); border-bottom-color: var(--accent); }
+  .banner { background: #2a2110; border: 1px solid #5c4813; color: #f0d58a; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  select, input[type=number] { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; font: inherit; }
+  .check { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--text); margin: 0; cursor: pointer; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip { border: 1px solid var(--line); background: var(--panel2); border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; user-select: none; }
+  .chip.on { border-color: var(--accent); background: #13263f; }
+  button.btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+  button.btn.secondary { background: var(--panel2); color: var(--text); border: 1px solid var(--line); font-weight: 500; }
+  button.btn.danger { background: #3d1418; color: #ffb4ad; border: 1px solid #7a2a2f; }
+  button.btn:disabled { opacity: .5; cursor: progress; }
+  .status { color: var(--muted); font-size: 13px; min-height: 18px; margin-top: 10px; }
+  .status.err { color: var(--red); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .kpi .l { color: var(--muted); font-size: 12px; }
+  .kpi .v { font-size: 20px; font-weight: 650; margin-top: 2px; }
+  .pos { color: var(--green); } .neg { color: var(--red); } .muted { color: var(--muted); }
+  .chart { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 14px; padding: 6px; }
+  .chart svg { display: block; width: 100%; }
+  .tip { position: absolute; pointer-events: none; background: #000c; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; display: none; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  .tablewrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); margin-right: 6px; }
+  .badge.ok { border-color: #2c6e3a; color: var(--green); background: #10261a; }
+  .badge.bad { border-color: #7a2a2f; color: #ffb4ad; background: #2a1215; }
+  .pill { font-size: 12px; color: var(--muted); }
+  .switch { display: flex; gap: 8px; align-items: center; cursor: pointer; font-size: 13px; }
+  .switch .track { width: 38px; height: 20px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); position: relative; transition: .15s; }
+  .switch .track::after { content: ""; position: absolute; width: 14px; height: 14px; top: 2px; left: 2px; border-radius: 50%; background: var(--muted); transition: .15s; }
+  .switch.on .track { background: #5a1a1f; border-color: var(--red); }
+  .switch.on .track::after { left: 20px; background: var(--red); }
+  .empty { color: var(--muted); padding: 18px; text-align: center; }
+  .md { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 18px 16px; overflow-x: auto; }
+  .md table { margin: 8px 0; } .md code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
+  .md blockquote { border-left: 3px solid var(--amber); margin: 10px 0; padding: 4px 12px; color: #f0d58a; }
+  ul.notes { margin: 6px 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Trading Bot <small>demo · simulated fills · no real money</small></h1>
+  <div class="row">
+    <span class="pill" id="dataPill">data: …</span>
+    <button class="btn secondary" id="refreshBtn" title="Download the latest free price data">Refresh data</button>
+    <div class="switch" id="killSwitch" title="Blocks all new entries (paper trader and replays)">
+      <div class="track"></div><span>Kill switch</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="banner">
+    Demo / paper only. Fills are simulated from free price feeds (Binance, Yahoo), with estimated spreads, commissions and financing.
+    Research so far shows <b>no strategy reliably passes the acceptance gates</b> across all 9 markets (see the Research tab).
+    Past results do not guarantee future results.
+  </div>
+
+  <nav id="tabs">
+    <button data-tab="replay" class="active">Replay</button>
+    <button data-tab="paper">Paper trading</button>
+    <button data-tab="lab">Backtest lab</button>
+    <button data-tab="research">Research</button>
+    <button data-tab="markets">Markets &amp; risk</button>
+  </nav>
+
+  <!-- REPLAY -->
+  <section id="tab-replay">
+    <div class="card">
+      <div class="muted" style="margin-bottom:10px">
+        Runs the paper trader over a recent window: parameters are fitted only on the year <i>before</i> each 90-day window,
+        then all selected markets trade through one account with the shared risk rules. It uses the same rules and engine as live paper trading.
+      </div>
+      <div class="controls">
+        <div><label>Window</label><select id="rpDays"><option value="30">Last 30 days</option><option value="90" selected>Last 90 days</option><option value="180">Last 180 days</option><option value="365">Last 365 days</option></select></div>
+        <div><label>Strategy</label><select id="rpStrategy"></select></div>
+        <div><label>Timeframe</label><select id="rpTf"><option value="4h" selected>4 hours</option><option value="1h">1 hour</option></select></div>
+        <div><label>Starting equity ($)</label><input id="rpEquity" type="number" value="100000" min="1000" step="1000"></div>
+        <div><label>Risk per trade (%)</label><input id="rpRisk" type="number" value="0.75" min="0.05" max="5" step="0.05"></div>
+        <div>
+          <label class="check"><input type="checkbox" id="rpLong"> Long only</label>
+          <label class="check" title="Skip a market for the next window if its training result was negative"><input type="checkbox" id="rpSit"> Sit-out rule</label>
+        </div>
+        <div><button class="btn" id="rpRun">Run replay</button></div>
+      </div>
+      <div class="chips" id="rpMarkets"></div>
+      <div class="status" id="rpStatus"></div>
+    </div>
+    <div id="rpOut" class="hidden">
+      <div class="kpis" id="rpKpis"></div>
+      <div id="rpAccept" style="margin-top:10px"></div>
+      <div class="chart" id="rpChart"></div>
+      <div class="grid2">
+        <div><h2>By market (closed trades)</h2><div class="tablewrap" id="rpBySym"></div></div>
+        <div><h2>Open at end of window</h2><div class="tablewrap" id="rpOpen"></div></div>
+      </div>
+      <h2>Trades</h2><div class="tablewrap" id="rpTrades"></div>
+      <h2>Parameters chosen (fitted on prior data only)</h2><div class="tablewrap" id="rpFits"></div>
+      <ul class="notes" id="rpNotes"></ul>
+    </div>
+  </section>
+
+  <!-- PAPER -->
+  <section id="tab-paper" class="hidden">
+    <div class="card">
+      <div class="muted" style="margin-bottom:10px">
+        Forward test on live prices. Each tick fetches the latest closed bars, re-fits parameters every 90 days, and simulates fills.
+        The first tick only initialises; trades start from the next bar. <span id="ppAuto"></span>
+      </div>
+      <div class="row">
+        <button class="btn" id="ppTick">Run tick now</button>
+        <button class="btn danger" id="ppReset">Reset paper account</button>
+      </div>
+      <div class="status" id="ppStatus"></div>
+    </div>
+    <div id="ppOut">
+      <div class="kpis" id="ppKpis"></div>
+      <div class="chart" id="ppChart"></div>
+      <div class="grid2">
+        <div><h2>Open positions</h2><div class="tablewrap" id="ppOpen"></div></div>
+        <div><h2>Parameters in use</h2><div class="tablewrap" id="ppParams"></div></div>
+      </div>
+      <h2>Closed trades</h2><div class="tablewrap" id="ppTrades"></div>
+    </div>
+  </section>
+
+  <!-- LAB -->
+  <section id="tab-lab" class="hidden">
+    <div class="card">
+      <div class="controls">
+        <div><label>Market</label><select id="lbSym"></select></div>
+        <div><label>Strategy</label><select id="lbStrategy"></select></div>
+        <div><label>Timeframe</label><select id="lbTf"><option value="1h">1 hour</option><option value="4h" selected>4 hours</option><option value="1D">Daily</option></select></div>
+        <div><label>Mode</label><select id="lbMode"><option value="walkforward" selected>Walk-forward (honest)</option><option value="fixed">Fixed default params</option></select></div>
+        <div>
+          <label class="check"><input type="checkbox" id="lbLong"> Long only</label>
+          <label class="check"><input type="checkbox" id="lbSit"> Sit-out rule</label>
+        </div>
+        <div><button class="btn" id="lbRun">Run backtest</button></div>
+      </div>
+      <div class="status" id="lbStatus"></div>
+    </div>
+    <div id="lbOut" class="hidden">
+      <div class="kpis" id="lbKpis"></div>
+      <div id="lbAccept" style="margin-top:10px"></div>
+      <div class="chart" id="lbChart"></div>
+      <h2 id="lbFoldsH">Walk-forward folds (each tested on unseen data)</h2><div class="tablewrap" id="lbFolds"></div>
+      <h2>Recent trades</h2><div class="tablewrap" id="lbTrades"></div>
+    </div>
+  </section>
+
+  <!-- RESEARCH -->
+  <section id="tab-research" class="hidden"><div class="md" id="mdOut">Loading…</div></section>
+
+  <!-- MARKETS -->
+  <section id="tab-markets" class="hidden">
+    <h2>Risk rules</h2><div class="tablewrap" id="mkRisk"></div>
+    <h2>Markets, cost assumptions and data</h2><div class="tablewrap" id="mkTable"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const money = (v) => v == null ? "–" : (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString(undefined, {maximumFractionDigits: 0});
+const money2 = (v) => v == null ? "–" : Math.abs(v) < 0.005 ? "$0.00" : (v < 0 ? "-$" : "+$") + Math.abs(v).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const pct = (v, d = 2) => v == null ? "–" : (v > 0 ? "+" : "") + v.toFixed(d) + "%";
+const num = (v, d = 2) => v == null ? "–" : Number(v).toFixed(d);
+const px = (v) => v == null ? "–" : Number(v).toPrecision(6).replace(/\.?0+$/, "");
+const cls = (v) => v > 0 ? "pos" : v < 0 ? "neg" : "";
+const dt = (s) => s ? String(s).replace("T", " ").slice(0, 16) : "–";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let OV = null;
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+async function runJob(path, body, statusEl) {
+  let job = await api(path, body);
+  const t0 = Date.now();
+  while (job.status === "queued" || job.status === "running") {
+    const secs = Math.round((Date.now() - t0) / 1000);
+    statusEl.className = "status";
+    statusEl.textContent = `${job.status === "queued" ? "Waiting for another job" : "Working"}… ${secs}s ${job.log.length ? "· " + job.log[job.log.length - 1] : ""}`;
+    await sleep(1000);
+    job = await api(`/api/jobs/${job.id}`);
+  }
+  if (job.status === "error") throw new Error(job.error);
+  statusEl.textContent = `Done in ${Math.round((Date.now() - t0) / 1000)}s.`;
+  return job.result;
+}
+
+function table(cols, rows, empty = "Nothing yet.") {
+  if (!rows.length) return `<div class="empty">${empty}</div>`;
+  const head = cols.map((c) => `<th class="${c.n ? "n" : ""}">${esc(c.h)}</th>`).join("");
+  const body = rows.map((r) => "<tr>" + cols.map((c) => {
+    const v = c.f ? c.f(r) : esc(r[c.k]);
+    const k = c.c ? c.c(r) : "";
+    return `<td class="${c.n ? "n" : ""} ${k}">${v}</td>`;
+  }).join("") + "</tr>").join("");
+  return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function kpis(el, items) {
+  el.innerHTML = items.map(([l, v, c]) => `<div class="kpi"><div class="l">${esc(l)}</div><div class="v ${c || ""}">${v}</div></div>`).join("");
+}
+
+function acceptBadges(el, accept) {
+  el.innerHTML = '<span class="muted" style="margin-right:8px">Acceptance gates:</span>' +
+    Object.entries(accept).map(([k, ok]) => `<span class="badge ${ok ? "ok" : "bad"}">${ok ? "✓" : "✗"} ${esc(k)}</span>`).join("");
+}
+
+function lineChart(el, s, base) {
+  const W = Math.max(320, el.clientWidth - 12), H = 280, P = {l: 70, r: 14, t: 14, b: 28};
+  if (!s || !s.v.length) { el.innerHTML = '<div class="empty">No equity data yet.</div>'; return; }
+  const v = s.v, n = v.length;
+  let lo = Math.min(...v, base ?? Infinity), hi = Math.max(...v, base ?? -Infinity);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const padv = (hi - lo) * 0.06; lo -= padv; hi += padv;
+  const X = (i) => P.l + (W - P.l - P.r) * (n === 1 ? 0.5 : i / (n - 1));
+  const Y = (y) => P.t + (H - P.t - P.b) * (1 - (y - lo) / (hi - lo));
+  const pts = v.map((y, i) => `${X(i).toFixed(1)},${Y(y).toFixed(1)}`).join(" ");
+  const up = v[n - 1] >= (base ?? v[0]);
+  const col = up ? "#3fb950" : "#f85149";
+  let grid = "";
+  for (let k = 0; k <= 4; k++) {
+    const y = lo + (hi - lo) * k / 4;
+    grid += `<line x1="${P.l}" x2="${W - P.r}" y1="${Y(y)}" y2="${Y(y)}" stroke="#2a3340"/>` +
+            `<text x="${P.l - 8}" y="${Y(y) + 4}" fill="#8b98a8" font-size="11" text-anchor="end">${money(y)}</text>`;
+  }
+  const xl = [0, Math.floor((n - 1) / 2), n - 1].map((i) =>
+    `<text x="${X(i)}" y="${H - 8}" fill="#8b98a8" font-size="11" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}">${dt(s.t[i]).slice(0, 10)}</text>`).join("");
+  const baseLine = base != null ? `<line x1="${P.l}" x2="${W - P.r}" y1="${Y(base)}" y2="${Y(base)}" stroke="#8b98a8" stroke-dasharray="4 4"/>` : "";
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}">${grid}${baseLine}
+    <polygon points="${X(0)},${Y(lo)} ${pts} ${X(n - 1)},${Y(lo)}" fill="${col}" opacity=".08"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.8"/>${xl}
+    <line id="cx" y1="${P.t}" y2="${H - P.b}" stroke="#8b98a8" opacity="0"/></svg><div class="tip"></div>`;
+  const svg = el.querySelector("svg"), tip = el.querySelector(".tip"), cx = el.querySelector("#cx");
+  svg.addEventListener("mousemove", (e) => {
+    const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(n - 1, Math.round((x - P.l) / (W - P.l - P.r) * (n - 1))));
+    cx.setAttribute("x1", X(i)); cx.setAttribute("x2", X(i)); cx.setAttribute("opacity", ".6");
+    tip.style.display = "block"; tip.innerHTML = `${dt(s.t[i])} · <b>${money(v[i])}</b>`;
+    tip.style.left = Math.min(r.width - 170, X(i) * r.width / W + 10) + "px"; tip.style.top = "10px";
+  });
+  svg.addEventListener("mouseleave", () => { tip.style.display = "none"; cx.setAttribute("opacity", "0"); });
+}
+
+const TRADE_COLS = [
+  {h: "Market", k: "symbol"},
+  {h: "Side", f: (r) => r.direction === 1 ? "long" : "short"},
+  {h: "Entry", f: (r) => dt(r.entry_time)},
+  {h: "Exit", f: (r) => dt(r.exit_time)},
+  {h: "Entry px", n: 1, f: (r) => px(r.entry_price)},
+  {h: "Exit px", n: 1, f: (r) => px(r.exit_price)},
+  {h: "Reason", k: "exit_reason"},
+  {h: "Financing", n: 1, f: (r) => money2(-(r.financing || 0))},
+  {h: "P&L", n: 1, f: (r) => money2(r.pnl), c: (r) => cls(r.pnl)},
+  {h: "R", n: 1, f: (r) => r.r != null ? num(r.r) : num(r.risk_usd ? r.pnl / r.risk_usd : null)},
+];
+const OPEN_COLS = [
+  {h: "Market", k: "symbol"}, {h: "Side", k: "side"}, {h: "Qty", n: 1, f: (r) => num(r.qty, 3)},
+  {h: "Entry", n: 1, f: (r) => px(r.entry)}, {h: "Stop", n: 1, f: (r) => px(r.stop)}, {h: "Last", n: 1, f: (r) => px(r.last)},
+  {h: "Unrealised", n: 1, f: (r) => money2(r.unrealised), c: (r) => cls(r.unrealised)},
+];
+
+function metricKpis(el, m, initial, finalEq) {
+  kpis(el, [
+    ["Return", pct(m.return_pct), cls(m.return_pct)],
+    ["Ending equity", money(finalEq ?? initial * (1 + m.return_pct / 100))],
+    ["Max drawdown", num(m.max_dd_pct) + "%", m.max_dd_pct > 15 ? "neg" : ""],
+    ["Profit factor", num(m.profit_factor), m.profit_factor > 1.3 ? "pos" : m.profit_factor < 1 ? "neg" : ""],
+    ["Closed trades", m.trades],
+    ["Win rate", num(m.win_rate_pct, 0) + "%"],
+    ["Avg R / trade", num(m.avg_r), cls(m.avg_r)],
+    ["Sharpe (ann.)", num(m.sharpe)],
+  ]);
+}
+
+// ------------------------------------------------------------- replay
+async function runReplay() {
+  const btn = $("rpRun"), st = $("rpStatus");
+  const symbols = [...document.querySelectorAll("#rpMarkets .chip.on")].map((c) => c.dataset.sym);
+  if (!symbols.length) { st.className = "status err"; st.textContent = "Pick at least one market."; return; }
+  btn.disabled = true;
+  try {
+    const r = await runJob("/api/replay", {
+      days: +$("rpDays").value, strategy: $("rpStrategy").value, timeframe: $("rpTf").value,
+      equity: +$("rpEquity").value, risk_per_trade: +$("rpRisk").value, long_only: $("rpLong").checked,
+      sit_out: $("rpSit").checked, symbols,
+    }, st);
+    $("rpOut").classList.remove("hidden");
+    metricKpis($("rpKpis"), r.metrics, r.initial_equity, r.final_equity);
+    acceptBadges($("rpAccept"), r.accept);
+    lineChart($("rpChart"), r.equity, r.initial_equity);
+    $("rpBySym").innerHTML = table([
+      {h: "Market", k: "symbol"}, {h: "Trades", n: 1, k: "trades"},
+      {h: "Win %", n: 1, f: (x) => num(100 * x.wins / x.trades, 0)},
+      {h: "Financing", n: 1, f: (x) => money2(-x.financing)},
+      {h: "Net P&L", n: 1, f: (x) => money2(x.net_pnl), c: (x) => cls(x.net_pnl)},
+    ], r.by_symbol, "No closed trades in this window.");
+    $("rpOpen").innerHTML = table(OPEN_COLS, r.open, "Flat at the end of the window.");
+    $("rpTrades").innerHTML = table(TRADE_COLS, r.trades, "No closed trades in this window.");
+    $("rpFits").innerHTML = table([
+      {h: "Market", k: "symbol"}, {h: "Window from", f: (x) => dt(x.from).slice(0, 10)},
+      {h: "Params", f: (x) => x.params ? esc(Object.entries(x.params).map(([k, v]) => `${k}=${v}`).join(", ")) : '<span class="muted">sat out</span>'},
+      {h: "Training score", n: 1, f: (x) => num(x.train_score)},
+      {h: "Plateau", n: 1, f: (x) => num(x.plateau)},
+    ], r.fits);
+    const notes = [...r.notes, ...r.risk_events.map((e) => "Risk: " + e)];
+    notes.unshift(`Window ${dt(r.start).slice(0, 10)} → ${dt(r.end).slice(0, 10)} · ${r.config.strategy} on ${r.config.timeframe} · ${(r.config.risk_per_trade * 100).toFixed(2)}% risk per trade`);
+    $("rpNotes").innerHTML = notes.map((n) => `<li>${esc(n)}</li>`).join("");
+  } catch (e) {
+    st.className = "status err"; st.textContent = "Failed: " + e.message;
+  } finally { btn.disabled = false; }
+}
+
+// -------------------------------------------------------------- paper
+async function loadPaper() {
+  const p = await api("/api/paper");
+  if (!p.initialised) {
+    kpis($("ppKpis"), [["Status", "Not started"], ["Markets", p.config.legs.length], ["Timeframe", p.config.timeframe], ["Starting equity", money(p.config.equity)]]);
+    $("ppChart").innerHTML = '<div class="empty">Click “Run tick now” to start the paper account (takes ~1 minute: it downloads live prices and fits each market).</div>';
+    $("ppOpen").innerHTML = table(OPEN_COLS, []); $("ppParams").innerHTML = '<div class="empty">Fitted on the first tick.</div>';
+    $("ppTrades").innerHTML = table(TRADE_COLS, []);
+    return;
+  }
+  const ret = (p.equity_now / p.initial_equity - 1) * 100, rs = p.risk;
+  const state = rs.kill_switch ? "Kill switch ON" : rs.halted ? "Halted (max DD)" : rs.day_blocked ? "Blocked today" : "Normal";
+  kpis($("ppKpis"), [
+    ["Equity", money(p.equity_now)], ["Total return", pct(ret), cls(ret)], ["Today", pct(rs.today_pct), cls(rs.today_pct)],
+    ["Drawdown", num(rs.drawdown_pct) + "%"], ["Risk state", state, state === "Normal" ? "pos" : "neg"],
+    ["Open / pending", `${p.open.length} / ${p.pending.length}`], ["Last bar processed", dt(p.last_bar)], ["Next bar due", dt(p.next_tick)],
+  ]);
+  lineChart($("ppChart"), p.equity, p.initial_equity);
+  $("ppOpen").innerHTML = table(OPEN_COLS, p.open, p.pending.length ? "Pending at next open: " + p.pending.map((x) => `${x.symbol} ${x.side}`).join(", ") : "Flat.");
+  $("ppParams").innerHTML = table([
+    {h: "Market", k: "symbol"},
+    {h: "Params", f: (x) => x.params ? esc(Object.entries(x.params).map(([k, v]) => `${k}=${v}`).join(", ")) : '<span class="muted">sat out</span>'},
+    {h: "Fitted", f: (x) => dt(x.fitted_at).slice(0, 10)}, {h: "Score", n: 1, f: (x) => num(x.train_score)},
+  ], Object.entries(p.params).map(([symbol, v]) => ({symbol, ...v})));
+  $("ppTrades").innerHTML = table(TRADE_COLS, p.trades, "No closed trades yet. 4h trend trades are infrequent: expect a few per week across all markets.");
+  $("ppStatus").textContent = `Started ${dt(p.started)} UTC.`;
+}
+
+async function paperTick() {
+  const btn = $("ppTick"); btn.disabled = true;
+  try { await runJob("/api/paper/tick", {}, $("ppStatus")); await loadPaper(); }
+  catch (e) { $("ppStatus").className = "status err"; $("ppStatus").textContent = "Failed: " + e.message; }
+  finally { btn.disabled = false; }
+}
+
+// ---------------------------------------------------------------- lab
+async function runLab() {
+  const btn = $("lbRun"), st = $("lbStatus"); btn.disabled = true;
+  try {
+    const r = await runJob("/api/backtest", {symbol: $("lbSym").value, strategy: $("lbStrategy").value, timeframe: $("lbTf").value,
+      mode: $("lbMode").value, long_only: $("lbLong").checked, sit_out: $("lbSit").checked}, st);
+    $("lbOut").classList.remove("hidden");
+    metricKpis($("lbKpis"), r.metrics, r.initial_equity);
+    acceptBadges($("lbAccept"), r.accept);
+    lineChart($("lbChart"), r.equity, r.initial_equity);
+    const wf = r.config.mode === "walkforward";
+    $("lbFoldsH").classList.toggle("hidden", !wf); $("lbFolds").classList.toggle("hidden", !wf);
+    $("lbFolds").innerHTML = table([
+      {h: "Test from", f: (x) => dt(x.test_start).slice(0, 10)}, {h: "Test to", f: (x) => dt(x.test_end).slice(0, 10)},
+      {h: "Params", f: (x) => Object.keys(x.params || {}).length ? esc(Object.entries(x.params).map(([k, v]) => `${k}=${v}`).join(", ")) : '<span class="muted">sat out</span>'},
+      {h: "Trades", n: 1, k: "test_trades"},
+      {h: "Return", n: 1, f: (x) => pct(x.test_return_pct), c: (x) => cls(x.test_return_pct)},
+      {h: "Plateau", n: 1, f: (x) => num(x.plateau)},
+    ], r.folds);
+    $("lbTrades").innerHTML = table(TRADE_COLS, r.trades);
+    st.textContent += ` ${r.bars} bars, ${dt(r.range[0]).slice(0, 10)} → ${dt(r.range[1]).slice(0, 10)}. ${wf ? "Only out-of-sample windows are shown." : "Fixed params over all history (in-sample, optimistic)."}`;
+  } catch (e) { st.className = "status err"; st.textContent = "Failed: " + e.message; }
+  finally { btn.disabled = false; }
+}
+
+// ----------------------------------------------------------- research
+function md(text) {
+  const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/\[(.+?)\]\((.+?)\)/g, "$1");
+  const lines = text.split("\n"); let out = "", i = 0;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (/^\|/.test(l)) {
+      const rows = []; while (i < lines.length && /^\|/.test(lines[i])) rows.push(lines[i++]);
+      const cells = (r) => r.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+      out += "<table><thead><tr>" + cells(rows[0]).map((c) => `<th>${inline(c)}</th>`).join("") + "</tr></thead><tbody>" +
+        rows.slice(2).map((r) => "<tr>" + cells(r).map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>").join("") + "</tbody></table>";
+      continue;
+    }
+    if (/^#{1,4} /.test(l)) { const h = l.match(/^#+/)[0].length; out += `<h${h + 1}>${inline(l.replace(/^#+ /, ""))}</h${h + 1}>`; }
+    else if (/^> /.test(l)) { let q = []; while (i < lines.length && /^> ?/.test(lines[i])) q.push(lines[i++].replace(/^> ?/, "")); out += `<blockquote>${inline(q.join(" "))}</blockquote>`; continue; }
+    else if (/^\s*(- |\d+\. )/.test(l)) { let it = []; while (i < lines.length && /^\s*(- |\d+\. |   )/.test(lines[i])) { if (/^\s*(- |\d+\. )/.test(lines[i])) it.push(lines[i].replace(/^\s*(- |\d+\. )/, "")); else it[it.length - 1] += " " + lines[i].trim(); i++; } out += "<ul>" + it.map((x) => `<li>${inline(x)}</li>`).join("") + "</ul>"; continue; }
+    else if (l.trim()) { let p = []; while (i < lines.length && lines[i].trim() && !/^(\||#|> |\s*- |\s*\d+\. )/.test(lines[i])) p.push(lines[i++]); out += `<p>${inline(p.join(" "))}</p>`; continue; }
+    i++;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------- overview
+async function loadOverview() {
+  OV = await api("/api/overview");
+  const strat = Object.entries(OV.strategies).map(([k, d]) => `<option value="${k}" title="${esc(d)}">${k}</option>`).join("");
+  for (const id of ["rpStrategy", "lbStrategy"]) if (!$(id).options.length) $(id).innerHTML = strat;
+  if (!$("lbSym").options.length) $("lbSym").innerHTML = OV.instruments.map((i) => `<option ${i.symbol === "BTCUSDT" ? "selected" : ""}>${i.symbol}</option>`).join("");
+  if (!$("rpMarkets").children.length) {
+    $("rpMarkets").innerHTML = OV.instruments.filter((i) => i.symbol !== "ES").map((i) =>
+      `<span class="chip ${OV.paper_legs.includes(i.symbol) ? "on" : ""}" data-sym="${i.symbol}">${i.symbol}</span>`).join("");
+    $("rpMarkets").onclick = (e) => { const c = e.target.closest(".chip"); if (c) c.classList.toggle("on"); };
+  }
+  $("killSwitch").classList.toggle("on", OV.kill_switch);
+  const lasts = OV.data.filter((d) => d.last).map((d) => d.last).sort();
+  const missing = OV.data.filter((d) => !d.file).map((d) => d.symbol);
+  $("dataPill").textContent = lasts.length ? `data to ${dt(lasts[0])} UTC${missing.length ? " · missing " + missing.join(", ") : ""}` : "no cached data yet (fetched on first run)";
+  const r = OV.risk;
+  $("mkRisk").innerHTML = table([{h: "Rule", k: "k"}, {h: "Value", k: "v"}], [
+    {k: "Risk per trade", v: (r.risk_per_trade * 100).toFixed(2) + "% of equity (stop distance × size)"},
+    {k: "Daily loss limit", v: (r.daily_loss_limit * 100).toFixed(1) + "% → flatten, no new entries until next UTC day"},
+    {k: "Max drawdown", v: (r.max_drawdown * 100).toFixed(0) + "% from peak → halt"},
+    {k: "Max open positions", v: r.max_open_positions}, {k: "Max per correlated group", v: r.max_per_group},
+    {k: "Every order", v: "has a protective stop; adapters refuse orders without one"},
+    {k: "Kill switch", v: OV.kill_switch ? "ON — no new entries" : "off"},
+  ]);
+  const dmap = Object.fromEntries(OV.data.map((d) => [d.symbol, d]));
+  $("mkTable").innerHTML = table([
+    {h: "Market", k: "symbol"}, {h: "Demo broker", f: (i) => `${esc(i.broker)} · ${esc(i.broker_symbol)}`}, {h: "Group", k: "group"},
+    {h: "Spread (est.)", n: 1, f: (i) => px(i.spread)},
+    {h: "Commission", n: 1, f: (i) => i.commission_pct ? (i.commission_pct * 100).toFixed(3) + "%/side" : i.commission_per_qty ? "$" + i.commission_per_qty + "/contract" : "in spread"},
+    {h: "Financing long/short", n: 1, f: (i) => i.broker === "binance" ? "real funding" : `${(i.financing_long * 100).toFixed(1)}% / ${(i.financing_short * 100).toFixed(1)}%`},
+    {h: "1h data", f: (i) => dmap[i.symbol]?.file ? `${esc(dmap[i.symbol].file)} → ${dt(dmap[i.symbol].last)}` : '<span class="neg">missing</span>'},
+  ], OV.instruments);
+}
+
+// --------------------------------------------------------------- wiring
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("active", x === b));
+  document.querySelectorAll("main > section").forEach((s) => s.classList.toggle("hidden", s.id !== "tab-" + b.dataset.tab));
+  if (b.dataset.tab === "paper") loadPaper().catch((err) => { $("ppStatus").className = "status err"; $("ppStatus").textContent = err.message; });
+  if (b.dataset.tab === "research") api("/api/research").then((r) => { $("mdOut").innerHTML = md(r.markdown); });
+});
+$("rpRun").onclick = runReplay;
+$("lbRun").onclick = runLab;
+$("ppTick").onclick = paperTick;
+$("ppReset").onclick = async () => {
+  if (!confirm("Reset the paper account? This deletes its trades and equity history.")) return;
+  await api("/api/paper/reset", {}); await loadPaper(); $("ppStatus").textContent = "Paper account reset.";
+};
+$("killSwitch").onclick = async () => {
+  const on = !$("killSwitch").classList.contains("on");
+  if (on && !confirm("Turn the kill switch ON? No new positions will be opened until it is turned off.")) return;
+  const r = await api("/api/killswitch", {on}); $("killSwitch").classList.toggle("on", r.kill_switch); loadOverview();
+};
+$("refreshBtn").onclick = async () => {
+  const b = $("refreshBtn"); b.disabled = true; const pill = $("dataPill");
+  try { await runJob("/api/data/refresh", {}, pill); await loadOverview(); }
+  catch (e) { pill.textContent = "refresh failed: " + e.message; }
+  finally { b.disabled = false; }
+};
+loadOverview().catch((e) => { $("dataPill").textContent = "server error: " + e.message; });
+</script>
+</body>
+</html>

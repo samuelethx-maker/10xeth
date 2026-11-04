@@ -148,6 +148,14 @@ class Leg:
         )
 
 
+    def slice(self, mask) -> Leg:
+        """Sub-range that keeps financing computed over the full history, so the
+        first bar of the slice still carries its accrued financing."""
+        d = {k: (v[mask] if isinstance(v, (np.ndarray, pd.DatetimeIndex)) else v)
+             for k, v in self.__dict__.items()}
+        return Leg(**d)
+
+
 class Engine:
     """Account state + rules. Feed bars with step(); serialisable for paper trading."""
 

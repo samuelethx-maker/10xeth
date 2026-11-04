@@ -82,8 +82,7 @@ def test_engine_state_roundtrip_matches_single_run():
 
 
 def _slice(leg: Leg, mask) -> Leg:
-    d = {k: (v[mask] if isinstance(v, (np.ndarray, pd.DatetimeIndex)) else v) for k, v in leg.__dict__.items()}
-    return Leg(**d)
+    return leg.slice(mask)
 
 
 def test_closed_bars_drops_incomplete():
@@ -113,3 +112,44 @@ def test_paper_trader_ticks_and_persists(tmp_path):
     assert len(eq) == 60 * 6  # one point per 4h bar, no gaps or duplicates
     assert pd.to_datetime(eq["time"]).is_monotonic_increasing
     assert (tmp_path / "report.md").read_text().startswith("# Paper trading report")
+
+
+def test_replay_matches_paper_trader(tmp_path):
+    """Replay must reproduce what the tick-by-tick paper trader does."""
+    from tradingbot.paper import replay
+
+    full = data.synthetic(24 * 520, start_price=2000, seed=21)
+    start = full.index[0] + pd.Timedelta(days=420)
+    end = start + pd.Timedelta(days=60)
+    cfg = PaperConfig(legs=["XAUUSD"], train_days=365, refit_days=90, state_dir=str(tmp_path))
+
+    clock = {"now": start}
+    fetch = lambda inst, days: full[full.index < clock["now"]]
+    pt = PaperTrader(cfg, fetch=fetch, fetch_fund=lambda i, s: None, log=lambda m: None)
+    pt.tick(start)
+    while clock["now"] < end:
+        clock["now"] += pd.Timedelta(hours=4)
+        pt.tick(clock["now"])
+    paper_trades = pd.read_csv(tmp_path / "trades.csv") if (tmp_path / "trades.csv").exists() else pd.DataFrame()
+
+    # replay window starts right after the bar the paper trader initialised on
+    out = replay(cfg, days=60, end=end, loader=lambda inst: full[full.index < end], log=lambda m: None)
+    assert out["fits"][0]["params"] == pt.state["params"]["XAUUSD"]["params"]
+    rt = out["result"].trades
+    assert len(rt) == len(paper_trades) > 0
+    for a, (_, b) in zip(rt, paper_trades.iterrows()):
+        assert a.entry_time == pd.Timestamp(b.entry_time) and a.pnl == pytest.approx(b.pnl)
+    assert out["engine"].equity() == pytest.approx(pt.state["engine_obj"].equity())
+
+
+def test_sit_out_rule_blocks_negative_training():
+    from tradingbot.walkforward import select_params, strategy_signals, _grid
+
+    b = resample(data.synthetic(24 * 400, start_price=2000, seed=8), "4h")
+    inst = get_instrument("XAUUSD")
+    combos = _grid({"entry_n": [20, 55]})
+    sigs = strategy_signals("trend", combos, b, False)
+    loose = select_params(b, slice(0, len(b)), inst, sigs, combos, {"entry_n": [20, 55]}, min_train_trades=1)
+    strict = select_params(b, slice(0, len(b)), inst, sigs, combos, {"entry_n": [20, 55]}, min_train_trades=1,
+                           min_score=loose["score"] + 1)
+    assert loose["best"] is not None and strict["best"] is None

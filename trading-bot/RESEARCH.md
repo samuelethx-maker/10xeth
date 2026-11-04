@@ -123,3 +123,34 @@ results are XAGUSD PF 1.36 (DD 18.7%), XAUUSD PF 1.23, MES PF 1.27, NAS100 PF 1.
      instead of CFDs; b) a "sit out when training score ≤ 0" rule; c) per-market session filters and different
      models for FX/indices (these clearly don't trend at 4h in this sample); d) longer 4h history once OANDA practice
      or Dukascopy data is available, since 2 years is a short out-of-sample window for non-crypto.
+
+
+## 2026-11-04: Phase 3c, sit-out rule (pre-registered) and replays
+
+**Sit-out rule:** before each window, skip a market if its best training score (return / max DD) is ≤ 0.
+It was proposed before testing and is judged out-of-sample (`bash scripts/research.sh E`).
+
+| Portfolio (trend, all 9) | PF without rule | PF with rule | Max DD with rule |
+|---|---:|---:|---:|
+| 4h, DD halt off | 1.09 | 1.06 | 46.2% |
+| Daily 1999→2026, DD halt off | 1.01 | 0.90 | 28.1% |
+
+**Rejected.** It cuts some losing trades in FX and indices but also skips the windows where those markets
+did trend. It stays available as an option (`--min-score 0`, or the dashboard checkbox), off by default.
+
+**Replays of the configured paper trader** (all 9 markets, 4h trend, $100k, 0.75% risk, parameters fitted only on
+the year before each 90-day window; the same code path as live paper trading, verified trade-for-trade by a test):
+
+| Window ending 2026-11-04 | Return | Max DD | PF | Trades | Gates |
+|---|---:|---:|---:|---:|:-:|
+| last 90 days | +12.6% | 10.5% | 1.37 | 45 | ❌ (trades) |
+| last 180 days | +9.0% | 15.2% | 1.10 | 90 | ❌ |
+| last 365 days | +14.6% | 14.7% | 1.13 | 165 | ❌ PF |
+
+The last year was positive, mostly from ETH, BTC, silver and gold; US30 and MES lost money. That is consistent with
+the earlier finding: the edge is concentrated in crypto and metals, and is too thin across the full basket to pass the gates.
+
+**Bug found and fixed while building the replay:** the tick-by-tick paper trader was not charging financing
+on the first bar of each tick (in practice every 4h bar), so its P&L would have been too optimistic compared with the
+backtests. Financing is now computed over the full history before slicing, and a test checks that the replay and the
+paper trader produce identical trades and equity.

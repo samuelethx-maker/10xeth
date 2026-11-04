@@ -26,7 +26,7 @@ import pandas as pd
 import yaml
 
 from . import data
-from .backtest import Engine, Leg, Trade, run_legs
+from .backtest import BacktestResult, Engine, Leg, run_legs
 from .instruments import Instrument, get_instrument
 from .risk import RiskConfig, kill_switch_active
 from .strategies import STRATEGIES
@@ -48,6 +48,7 @@ class PaperConfig:
     history_days: int = 540
     state_dir: str = "results/paper"
     delay_minutes: int = 15  # wait after bar close for delayed feeds
+    min_train_score: float | None = None  # sit a market out unless training score > this
     risk: RiskConfig = field(default_factory=RiskConfig)
 
     @classmethod
@@ -55,6 +56,10 @@ class PaperConfig:
         d = yaml.safe_load(Path(path).read_text()) or {}
         risk = RiskConfig(**d.pop("risk", {}))
         return cls(risk=risk, **d)
+
+    @property
+    def min_score(self) -> float:
+        return float("-inf") if self.min_train_score is None else float(self.min_train_score)
 
     @property
     def dir(self) -> Path:
@@ -128,7 +133,8 @@ class PaperTrader:
         usdjpy = self.state["engine_obj"].usdjpy
         sel = select_params(bars, slice(len(bars) - train, len(bars)), inst, sigs, combos, grid,
                             self.cfg.risk, self.cfg.equity, funding=funding,
-                            usd_quote_rate=usdjpy if np.isfinite(usdjpy) else 150.0)
+                            usd_quote_rate=usdjpy if np.isfinite(usdjpy) else 150.0,
+                            min_score=self.cfg.min_score)
         self.state["params"][sym] = {"params": sel["params"], "fitted_at": now.isoformat(),
                                      "train_score": sel["score"], "plateau": sel["plateau"]}
         self.log(f"[{sym}] refit -> {sel['params']} (score {sel['score']:.2f}, plateau {sel['plateau']:.2f})")
@@ -164,7 +170,7 @@ class PaperTrader:
             mask = bars.index > pd.Timestamp(last)
             if not mask.any():
                 continue
-            new_legs.append(Leg.build(inst, bars[mask], sig[mask], funding))
+            new_legs.append(Leg.build(inst, bars, sig, funding).slice(mask))
 
         if self.state["started"] is None:
             self.state["started"] = now.isoformat()
@@ -249,3 +255,77 @@ class PaperTrader:
             now = pd.Timestamp.now(tz="UTC")
             nxt = now.floor(delta) + delta + pd.Timedelta(minutes=self.cfg.delay_minutes)
             time.sleep(max(30.0, (nxt - now).total_seconds()))
+
+
+def load_or_fetch(inst: Instrument, history_days: int = 1000) -> pd.DataFrame:
+    """Cached 1h bars if present, otherwise fetch from the free live feed and cache."""
+    df = data.load_symbol(inst.symbol)
+    if df is not None:
+        return df
+    df = fetch_live(inst, history_days)
+    data.save_csv(df, data.data_path(inst.symbol, "" if inst.broker == "binance" else "yahoo"))
+    return df
+
+
+def replay(cfg: PaperConfig, days: int, end: pd.Timestamp | None = None,
+           loader: Callable[[Instrument], pd.DataFrame | None] | None = None,
+           log: Callable[[str], None] = print) -> dict:
+    """What the paper trader would have done over the last `days`: parameters are
+    fitted only on data before each `refit_days` window (same rule and engine as
+    live paper trading), then traded through one shared account."""
+    end = end or pd.Timestamp.now(tz="UTC")
+    start = end - pd.Timedelta(days=days)
+    loader = loader or load_or_fetch
+    grid = GRIDS[cfg.strategy]
+    combos = _grid(grid)
+    cls = STRATEGIES[cfg.strategy]
+    legs, fits, notes = [], [], []
+    for sym in cfg.legs:
+        inst = get_instrument(sym)
+        try:
+            raw = loader(inst)
+        except Exception as e:
+            notes.append(f"{sym}: data unavailable ({e})")
+            continue
+        if raw is None or raw.empty:
+            notes.append(f"{sym}: no data")
+            continue
+        bars = closed_bars(raw, cfg.timeframe, end)
+        funding = data.load_funding(inst.symbol) if inst.broker == "binance" else None
+        train = int(cfg.train_days * bars_per_day(bars))
+        sigs = strategy_signals(cfg.strategy, combos, bars, cfg.long_only)
+        log(f"{sym}: fitting")
+        parts = []
+        t0 = start
+        while t0 < end:
+            t1 = min(t0 + pd.Timedelta(days=cfg.refit_days), end)
+            win = (bars.index >= t0) & (bars.index < t1)
+            if win.any():
+                i0 = int(np.argmax(win))
+                sel = None
+                if i0 < train:
+                    notes.append(f"{sym}: only {i0} bars before {t0:%Y-%m-%d}, need {train} to fit; flat that window")
+                else:
+                    sel = select_params(bars, slice(i0 - train, i0), inst, sigs, combos, grid, cfg.risk,
+                                        cfg.equity, funding=funding, usd_quote_rate=150.0,
+                                        min_score=cfg.min_score)
+                    fits.append({"symbol": sym, "from": t0, "to": t1, "params": sel["params"],
+                                 "train_score": sel["score"], "plateau": sel["plateau"]})
+                if sel is None or sel["best"] is None:
+                    sg = cls.empty_signals(bars.index[win])
+                    sg["exit_long"] = sg["exit_short"] = True
+                    parts.append(sg)
+                else:
+                    parts.append(sigs[sel["best"]][win])
+            t0 = t1
+        if parts:
+            sig = pd.concat(parts)
+            legs.append(Leg.build(inst, bars.loc[sig.index], sig, funding))
+    if not legs:
+        raise RuntimeError("no market had data for the replay window")
+    log("simulating account")
+    eng = Engine(cfg.risk, cfg.equity)
+    run_legs(legs, eng, close_at_end=False)
+    res = BacktestResult("PORTFOLIO", cfg.strategy, eng.trades, eng.equity_series(), cfg.equity,
+                         list(eng.rm.events))
+    return {"result": res, "engine": eng, "fits": fits, "notes": notes, "start": start, "end": end}

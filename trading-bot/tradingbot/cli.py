@@ -6,6 +6,7 @@
   tradingbot walkforward --symbol BTCUSDT --timeframe 4h --strategy all
   tradingbot portfolio --strategy trend --timeframe 4h
   tradingbot paper [--loop]                       # simulated paper trading, no keys
+  tradingbot dashboard                            # browser UI on http://127.0.0.1:8050
   tradingbot instruments
 """
 
@@ -102,6 +103,7 @@ def _wf(sym, args, risk):
             bars, inst, sname, int(args.train_days * bpd), int(args.test_days * bpd), risk=risk,
             equity=args.equity, long_only=args.long_only, usd_quote_rate=args.usdjpy,
             funding=funding, financing=args.financing,
+            min_score=args.min_score if args.min_score is not None else float("-inf"),
         )
     return inst, bars, out
 
@@ -219,6 +221,13 @@ def cmd_paper(args) -> int:
     return 0
 
 
+def cmd_dashboard(args) -> int:
+    from .dashboard import serve
+
+    serve(args.host, args.port, args.auto_paper)
+    return 0
+
+
 def cmd_download(args) -> int:
     symbols = list(INSTRUMENTS) if args.all else [args.symbol]
     for sym in symbols:
@@ -281,6 +290,9 @@ def main(argv: list[str] | None = None) -> int:
         sp.add_argument("--usdjpy", type=float, default=150.0)
         sp.add_argument("--config", default=str(Path(__file__).resolve().parent.parent / "config" / "settings.yaml"))
         sp.add_argument("--out", help="directory for CSV outputs")
+        sp.add_argument("--min-score", type=float,
+                        help="sit a market out for the next window unless its training score "
+                             "(return/maxDD) is above this, e.g. 0")
         sp.add_argument("--max-dd", type=float,
                         help="override the max-drawdown halt (research only, e.g. 1.0 = never halt)")
 
@@ -303,6 +315,12 @@ def main(argv: list[str] | None = None) -> int:
     pp.add_argument("--loop", action="store_true", help="run forever, one tick per bar")
     pp.add_argument("--reset", action="store_true", help="wipe paper state first")
     pp.set_defaults(fn=cmd_paper)
+
+    db = sub.add_parser("dashboard", help="web dashboard to test everything in a browser")
+    db.add_argument("--host", default="127.0.0.1")
+    db.add_argument("--port", type=int, default=8050)
+    db.add_argument("--auto-paper", action="store_true", help="tick the paper trader automatically every bar")
+    db.set_defaults(fn=cmd_dashboard)
 
     d = sub.add_parser("download")
     d.add_argument("--symbol", default="BTCUSDT")

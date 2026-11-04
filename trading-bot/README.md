@@ -7,6 +7,27 @@ adapter refuses non-practice endpoints unless `ALLOW_LIVE=1` is set.
 No strategy here is known to be profitable. The goal is to *measure* whether one is,
 using the acceptance gates below, before any paper trading.
 
+## Try it in the browser (demo)
+
+```bash
+cd trading-bot
+uv sync --extra live
+uv run tradingbot dashboard            # open http://127.0.0.1:8050
+uv run tradingbot dashboard --auto-paper   # also paper-trades automatically every 4h bar
+```
+
+No accounts or API keys needed; missing price data is downloaded on first use (or click **Refresh data**).
+
+| Tab | What you can test |
+|---|---|
+| **Replay** | "What would the paper trader have done over the last 30/90/180/365 days?" Pick markets, strategy, timeframe, equity, risk per trade, long-only and the sit-out rule. Shows the equity curve, P&L by market, every trade, open positions, and the parameters chosen on prior data only. |
+| **Paper trading** | The live forward test: run a tick, see equity, today's P&L, drawdown, risk state, open positions, trades and parameters in use. Reset the account. |
+| **Backtest lab** | Walk-forward (out-of-sample) or fixed-parameter backtest for any market / strategy / timeframe, with acceptance gates and per-fold results. |
+| **Research** | `RESEARCH.md`: what has been tested and why the system does not pass yet. |
+| **Markets & risk** | Risk rules, cost assumptions and data freshness per market. |
+
+The **Kill switch** in the header blocks all new entries (same as creating the `KILL_SWITCH` file).
+
 ## Setup
 
 ```bash
@@ -30,6 +51,7 @@ uv run tradingbot backtest --symbol BTCUSDT --data data/BTCUSDT_1h.csv --trades-
 uv run tradingbot walkforward --symbol BTCUSDT --timeframe 4h --out results/wf   # out-of-sample only
 uv run tradingbot portfolio --timeframe 4h            # all instruments, one account, shared risk
 uv run tradingbot paper                               # one paper-trading tick (cron), or --loop
+uv run tradingbot dashboard                           # browser UI (see above)
 ```
 
 Research results and decisions are logged in [RESEARCH.md](RESEARCH.md).
@@ -94,7 +116,8 @@ tradingbot/
   indicators.py    causal indicators (EMA, ATR, Donchian, Bollinger, RSI)
   strategies/      trend breakout, mean reversion, EMA momentum (Strategy interface)
   walkforward.py   rolling train/test optimisation, robustness diagnostics, resampling
-  paper.py         simulated paper trader (live free data, persisted state, report)
+  paper.py         simulated paper trader (live free data, persisted state, report) + replay
+  dashboard.py     local web server + JSON API for the browser UI (web/index.html)
   risk.py          position sizing, daily loss / drawdown limits, kill switch
   backtest.py      Engine (shared by backtest / portfolio / paper), financing
   metrics.py       stats + acceptance gates

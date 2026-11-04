@@ -48,9 +48,11 @@ def select_params(
     usd_quote_rate: float | None = None,
     funding: pd.Series | None = None,
     financing: bool = True,
+    min_score: float = -np.inf,
 ) -> dict:
     """Backtest every combo on the training window; pick the best by score.
-    Shared by the walk-forward and the paper trader's periodic refit."""
+    Shared by the walk-forward and the paper trader's periodic refit.
+    If the best score is not above `min_score`, the market is sat out (best=None)."""
     ms = [
         metrics.compute(run_backtest(bars.iloc[tr], s.iloc[tr], inst, equity, risk,
                                      usd_quote_rate=usd_quote_rate, funding=funding,
@@ -60,9 +62,10 @@ def select_params(
     scores = np.array([score(m, min_train_trades) for m in ms])
     plateau = float(np.mean([m["profit_factor"] > 1 and m["trades"] >= min_train_trades for m in ms]))
     best = int(np.argmax(scores))
+    ok = bool(np.isfinite(scores[best]) and scores[best] > min_score)
     return {
-        "best": best if np.isfinite(scores[best]) else None,
-        "params": combos[best] if np.isfinite(scores[best]) else None,
+        "best": best if ok else None,
+        "params": combos[best] if ok else None,
         "score": float(scores[best]),
         "scores": scores,
         "plateau": plateau,
@@ -151,6 +154,7 @@ def walk_forward(
     usd_quote_rate: float | None = None,
     funding: pd.Series | None = None,
     financing: bool = True,
+    min_score: float = -np.inf,
 ) -> WalkForwardResult:
     grid = grid or GRIDS[strategy]
     combos = _grid(grid)
@@ -166,14 +170,14 @@ def walk_forward(
     while start + train + test <= len(bars):
         tr, te = slice(start, start + train), slice(start + train, start + train + test)
         sel = select_params(bars, tr, inst, signals, combos, grid, risk, equity, min_train_trades,
-                            usd_quote_rate, funding, financing)
+                            usd_quote_rate, funding, financing, min_score)
         best, plateau = sel["best"], sel["plateau"]
         if best is None:
             # Nothing tradable in training: sit this fold out (flat equity).
             flat = pd.Series(cur_equity, index=bars.index[te], name="equity")
             oos_equity.append(flat)
             folds.append(Fold(bars.index[tr][0], bars.index[te][0], bars.index[te][-1], {},
-                              -np.inf, plateau, 0.0, 0.0, 0))
+                              sel["score"], plateau, 0.0, 0.0, 0))
             start += test
             continue
         scores = sel["scores"]
