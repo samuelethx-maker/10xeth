@@ -83,6 +83,45 @@ def _quote_to_usd(inst: Instrument, price: float, usdjpy: float | None) -> float
     return 1.0 / usdjpy
 
 
+def _usdjpy_for(inst: Instrument, index: pd.DatetimeIndex, usdjpy) -> np.ndarray | None:
+    """Per-bar USDJPY known at each bar's open, for JPY-quoted crosses (GBPJPY).
+    An explicit Series wins; otherwise cached USDJPY bar *opens* are used when they
+    cover the period (opens are known at bar start, so this is causal); a float is
+    the fallback for anything not covered."""
+    if inst.quote_ccy != "JPY" or inst.symbol == "USDJPY":
+        return None
+    fallback = None if isinstance(usdjpy, pd.Series) or usdjpy is None else float(usdjpy)
+    ref = usdjpy if isinstance(usdjpy, pd.Series) else _cached_usdjpy()
+    if ref is None or ref.empty or ref.index[-1] < index[-1] - pd.Timedelta(days=4):
+        # No (fresh) reference: let the engine's running rate / fallback apply.
+        return None if fallback is None else np.full(len(index), fallback)
+    fx = ref.sort_index().reindex(index, method="ffill")
+    if fallback is not None:
+        fx = fx.fillna(fallback)
+    return fx.bfill().to_numpy(float)
+
+
+_USDJPY_CACHE: dict[str, pd.Series | None] = {}
+
+
+def _cached_usdjpy() -> pd.Series | None:
+    """Daily + hourly USDJPY opens from the local data cache (hourly wins where both exist)."""
+    if "s" not in _USDJPY_CACHE:
+        from . import data  # local import: data is optional for pure-engine use
+
+        parts = []
+        for interval in ("1d", "1h"):
+            df = data.load_symbol("USDJPY", "", interval)
+            if df is not None:
+                parts.append(df["open"])
+        if parts:
+            s = pd.concat(parts)
+            _USDJPY_CACHE["s"] = s[~s.index.duplicated(keep="last")].sort_index()
+        else:
+            _USDJPY_CACHE["s"] = None
+    return _USDJPY_CACHE["s"]
+
+
 def financing_per_bar(
     inst: Instrument, index: pd.DatetimeIndex, funding: pd.Series | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -133,12 +172,7 @@ class Leg:
             fl, fs = financing_per_bar(inst, bars.index, funding)
         else:
             fl = fs = np.zeros(len(bars))
-        if isinstance(usdjpy, pd.Series):
-            fx = usdjpy.reindex(bars.index, method="ffill").to_numpy()
-        elif usdjpy is not None:
-            fx = np.full(len(bars), float(usdjpy))
-        else:
-            fx = None
+        fx = _usdjpy_for(inst, bars.index, usdjpy)
         return cls(
             inst, bars.index,
             *(bars[k].to_numpy(float) for k in ("open", "high", "low", "close")),
@@ -204,6 +238,17 @@ class Engine:
             for s, t in self.pos.items()
         )
 
+    def gross_notional(self, prices: dict[str, float] | None = None) -> float:
+        """Sum of |position value| in USD across open positions."""
+        prices = prices or {}
+        total = 0.0
+        for s, t in self.pos.items():
+            inst = get_instrument(s)
+            px = prices.get(s, self.last_close.get(s, t.entry_price))
+            q2u = 1.0 if inst.quote_ccy == "USD" else (1.0 / px if s == "USDJPY" else 1.0 / self.usdjpy)
+            total += abs(t.qty * px * inst.multiplier * q2u)
+        return total
+
     def _slots_ok(self, inst: Instrument) -> bool:
         if len(self.pos) >= self.risk.max_open_positions:
             return False
@@ -260,6 +305,10 @@ class Engine:
             fill = leg.o[i] + d * half
             q2u = self._q2u(leg, i, fill)
             qty = position_size(inst, self.cash, fill, sd, self.risk.risk_per_trade, q2u)
+            room = self.risk.max_gross_leverage * self.equity(opens) - self.gross_notional(opens)
+            unit_notional = fill * inst.multiplier * q2u
+            if qty * unit_notional > room:
+                qty = inst.round_qty(max(room, 0.0) / unit_notional)
             if qty > 0:
                 cost = self._commission(inst, qty, fill, q2u)
                 self.cash -= cost
@@ -298,7 +347,8 @@ class Engine:
         if self.record_equity:
             self.eq_times.append(t)
             self.eq_values.append(eq)
-        if self.rm.update(eq, t):
+        flatten = self.rm.update(eq, t)
+        if flatten:
             self.pending_exit.update(self.pos)
             self.pending_entry.clear()
         for leg, i in rows:
@@ -307,7 +357,9 @@ class Engine:
             if p is not None and ((p.direction == 1 and leg.exit_l[i]) or (p.direction == -1 and leg.exit_s[i])):
                 self.pending_exit.add(sym)
             e = leg.entry[i]
-            if e == 0 or np.isnan(leg.stop_d[i]):
+            # A risk limit that just tripped must not leave entries queued for the
+            # next open (which may fall on a new day after the daily block resets).
+            if flatten or e == 0 or np.isnan(leg.stop_d[i]):
                 continue
             exiting = sym in self.pending_exit
             if p is None or exiting or p.direction != e:
@@ -331,7 +383,7 @@ class Engine:
         return {
             "initial_equity": self.initial_equity,
             "cash": self.cash,
-            "usdjpy": self.usdjpy,
+            "usdjpy": None if not np.isfinite(self.usdjpy) else self.usdjpy,
             "positions": {s: t.to_dict() for s, t in self.pos.items()},
             "pending_exit": sorted(self.pending_exit),
             "pending_entry": {s: [d, sd, None if np.isnan(td) else td] for s, (d, sd, td) in self.pending_entry.items()},
@@ -345,7 +397,7 @@ class Engine:
 
     @classmethod
     def from_dict(cls, d: dict, risk: RiskConfig) -> Engine:
-        e = cls(risk, d["initial_equity"], d["usdjpy"], record_equity=False)
+        e = cls(risk, d["initial_equity"], np.nan if d["usdjpy"] is None else d["usdjpy"], record_equity=False)
         e.cash = d["cash"]
         e.pos = {s: Trade.from_dict(t) for s, t in d["positions"].items()}
         e.pending_exit = set(d["pending_exit"])
@@ -371,7 +423,7 @@ def run_legs(legs: list[Leg], engine: Engine, close_at_end: bool = True,
     idx = [leg.times.get_indexer(all_times) for leg in legs]
     last_rows: dict[str, tuple[Leg, int]] = {}
     for k, t in enumerate(all_times):
-        rows = [(leg, int(ix[k])) for leg, ix in zip(legs, idx) if ix[k] >= 0]
+        rows = [(leg, int(ix[k])) for leg, ix in zip(legs, idx, strict=True) if ix[k] >= 0]
         for r in rows:
             last_rows[r[0].inst.symbol] = r
         engine.step(t, rows)

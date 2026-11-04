@@ -16,9 +16,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import data, metrics
 import pandas as pd
 
+from . import data, metrics
 from .backtest import Leg, run_backtest, run_portfolio
 from .instruments import INSTRUMENTS, get_instrument
 from .risk import RiskConfig
@@ -120,7 +120,7 @@ def cmd_walkforward(args) -> int:
     symbols = list(INSTRUMENTS) if args.all else [get_instrument(s).symbol for s in args.symbol.split(",")]
     rows = []
     for sym in symbols:
-        inst, bars, results = _wf(sym, args, risk)
+        _, _, results = _wf(sym, args, risk)
         if results is None:
             continue
         for sname, wf in results.items():
@@ -181,6 +181,9 @@ def cmd_portfolio(args) -> int:
     m["accepted"] = all(metrics.acceptance(m).values())
     print()
     print(metrics.format_table([m]))
+    lo, hi = metrics.bootstrap_pf([t.pnl for t in res.trades])
+    print(f"\nProfit factor 95% bootstrap CI: [{lo:.2f}, {hi:.2f}]"
+          f"{'  -> not distinguishable from break-even' if lo <= 1.0 else ''}")
     tf = res.trades_frame()
     if len(tf):
         by = tf.groupby("symbol").agg(trades=("pnl", "size"), net_pnl=("pnl", "sum"),
@@ -254,6 +257,58 @@ def cmd_instruments(_args) -> int:
     for i in INSTRUMENTS.values():
         print(f"{i.symbol:10} {i.broker:8} {i.broker_symbol:11} mult={i.multiplier:<5g} "
               f"spread={i.spread:<6g} step={i.qty_step:g}")
+    return 0
+
+
+def cmd_broker_check(args) -> int:
+    from .brokers import get_broker
+
+    inst = get_instrument(args.symbol or {"oanda": "USDJPY", "binance": "BTCUSDT", "ibkr": "MES"}[args.broker])
+    if inst.broker != args.broker:
+        print(f"{inst.symbol} trades on {inst.broker}, not {args.broker}")
+        return 2
+    try:
+        b = get_broker(args.broker)
+    except Exception as e:
+        print(f"cannot create {args.broker} broker: {e}")
+        return 1
+    with b:
+        try:
+            print(f"[1] connected: {b.name}")
+            print(f"[2] equity: {b.equity():,.2f}")
+            print(f"[3] positions: {b.positions()}")
+            print(f"[4] open orders: {b.open_orders()}")
+            px = b.price(inst)
+            print(f"[5] {inst.symbol} quote: {px}")
+            if not args.test_order:
+                return 0
+            qty = b.min_test_qty(inst)
+            stop = inst.round_price(px * 0.98)
+            print(f"[6] placing market BUY {qty:g} {inst.symbol} with stop {stop} (DEMO account)")
+            res = b.market_order(inst, qty, stop=stop)
+            print(f"[7] result: {res}")
+            print(f"[8] positions: {b.positions()}  orders: {b.open_orders(inst)}")
+            if not res.ok:
+                return 1
+            print(f"[9] closing {inst.symbol}")
+            print(f"[10] result: {b.close(inst)}")
+            print(f"[11] positions: {b.positions()}")
+        except Exception as e:
+            print(f"FAILED: {type(e).__name__}: {e}")
+            return 1
+    return 0
+
+
+def cmd_reconcile(args) -> int:
+    from .paper import PaperConfig, PaperTrader
+
+    cfg = PaperConfig.load(args.config)
+    if not args.dry_run and cfg.execution != "live":
+        print(f"execution is {cfg.execution!r} in {args.config}; use --dry-run or set execution: live")
+        return 2
+    pt = PaperTrader(cfg)
+    acts = pt.execute(dry_run=args.dry_run)
+    print(f"{len(acts)} journal entries; log: {cfg.dir / 'orders.jsonl'}")
     return 0
 
 
@@ -332,6 +387,17 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--no-funding", dest="funding", action="store_false",
                    help="skip Binance funding-rate history for crypto")
     d.set_defaults(fn=cmd_download)
+
+    bc = sub.add_parser("broker-check", help="connect to a DEMO broker account and print equity/positions/quote")
+    bc.add_argument("--broker", required=True, choices=["oanda", "binance", "ibkr"])
+    bc.add_argument("--symbol")
+    bc.add_argument("--test-order", action="store_true", help="place and close a minimum-size order with a stop")
+    bc.set_defaults(fn=cmd_broker_check)
+
+    rc = sub.add_parser("reconcile", help="make demo broker positions match the paper-trader state once")
+    rc.add_argument("--config", default=str(Path(__file__).resolve().parent.parent / "config" / "paper.yaml"))
+    rc.add_argument("--dry-run", action="store_true", help="log intended actions only")
+    rc.set_defaults(fn=cmd_reconcile)
 
     sub.add_parser("instruments").set_defaults(fn=cmd_instruments)
 

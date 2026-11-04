@@ -1,11 +1,10 @@
 import json
 
-import numpy as np
 import pandas as pd
 import pytest
 
 from tradingbot import data
-from tradingbot.backtest import Engine, Leg, financing_per_bar, run_backtest, run_legs, run_portfolio
+from tradingbot.backtest import Engine, Leg, financing_per_bar, run_backtest, run_legs
 from tradingbot.instruments import get_instrument
 from tradingbot.paper import PaperConfig, PaperTrader, closed_bars
 from tradingbot.risk import RiskConfig
@@ -124,7 +123,9 @@ def test_replay_matches_paper_trader(tmp_path):
     cfg = PaperConfig(legs=["XAUUSD"], train_days=365, refit_days=90, state_dir=str(tmp_path))
 
     clock = {"now": start}
-    fetch = lambda inst, days: full[full.index < clock["now"]]
+    def fetch(inst, days):
+        return full[full.index < clock["now"]]
+
     pt = PaperTrader(cfg, fetch=fetch, fetch_fund=lambda i, s: None, log=lambda m: None)
     pt.tick(start)
     while clock["now"] < end:
@@ -143,7 +144,7 @@ def test_replay_matches_paper_trader(tmp_path):
 
 
 def test_sit_out_rule_blocks_negative_training():
-    from tradingbot.walkforward import select_params, strategy_signals, _grid
+    from tradingbot.walkforward import _grid, select_params, strategy_signals
 
     b = resample(data.synthetic(24 * 400, start_price=2000, seed=8), "4h")
     inst = get_instrument("XAUUSD")
@@ -153,3 +154,53 @@ def test_sit_out_rule_blocks_negative_training():
     strict = select_params(b, slice(0, len(b)), inst, sigs, combos, {"entry_n": [20, 55]}, min_train_trades=1,
                            min_score=loose["score"] + 1)
     assert loose["best"] is not None and strict["best"] is None
+
+
+def test_gbpjpy_uses_per_bar_usdjpy_series():
+    from tradingbot.backtest import _usdjpy_for
+
+    idx = pd.date_range("2024-01-01", periods=5, freq="4h", tz="UTC")
+    ref = pd.Series([140.0, 141.0, 150.0], index=pd.DatetimeIndex(["2023-12-31", "2024-01-01 04:00", "2024-01-01 12:00"], tz="UTC"))
+    fx = _usdjpy_for(get_instrument("GBPJPY"), idx, ref)
+    assert list(fx) == [140.0, 141.0, 141.0, 150.0, 150.0]
+    assert _usdjpy_for(get_instrument("USDJPY"), idx, ref) is None
+    assert _usdjpy_for(get_instrument("XAUUSD"), idx, ref) is None
+
+
+def test_no_entry_queued_on_bar_when_daily_limit_trips():
+    """A daily-limit breach on the last bar of a day must not open a new trade at the next day's open."""
+    inst = get_instrument("XAUUSD")
+    idx = pd.date_range("2024-01-01 12:00", periods=6, freq="4h", tz="UTC")  # 12,16,20 | 00,04,08
+    closes = [2000, 2000, 1900, 1900, 1900, 1900]
+    b = pd.DataFrame({"open": [2000, 2000, 2000, 1900, 1900, 1900], "high": [2001, 2001, 2001, 1901, 1901, 1901],
+                      "low": [1999, 1999, 1899, 1899, 1899, 1899], "close": closes, "volume": 1.0}, index=idx)
+    sig = Strategy.empty_signals(idx)
+    sig["entry"] = [1, 0, 1, 0, 0, 0]
+    sig["stop_dist"] = 500.0  # far stop so the loss shows up as open P&L
+    res = run_backtest(b, sig, inst, 100_000, RiskConfig(risk_per_trade=0.2, daily_loss_limit=0.03, max_drawdown=0.9),
+                       financing=False)
+    assert any("daily loss" in e for e in res.risk_events)
+    assert len(res.trades) == 1  # the 20:00 signal on the breach bar was not acted on next day
+
+
+def test_gross_leverage_cap_limits_new_positions():
+    legs = [_leg(s, seed=i, price=p) for i, (s, p) in enumerate([("XAUUSD", 2000), ("NAS100USD", 16000), ("BTCUSDT", 40000)])]
+    eng = Engine(RiskConfig(max_gross_leverage=1.0, risk_per_trade=0.05), 100_000)
+    all_t = legs[0].times.union(legs[1].times).union(legs[2].times)
+    idx = [leg.times.get_indexer(all_t) for leg in legs]
+    worst = 0.0
+    for k, t in enumerate(all_t):
+        rows = [(leg, int(ix[k])) for leg, ix in zip(legs, idx) if ix[k] >= 0]
+        eng.step(t, rows)
+        worst = max(worst, eng.gross_notional() / eng.equity())
+    assert len(eng.trades) > 0
+    assert worst < 1.0 * 1.15  # cap applied at entry; later price moves can drift it slightly
+
+
+def test_closed_bars_waits_for_lagging_feed():
+    b = data.synthetic(30, freq="1h")
+    t0 = b.index[0]
+    lagging = b[b.index < t0 + pd.Timedelta(hours=7)]  # 06:00 bar of the 04-08 bucket missing
+    now = t0 + pd.Timedelta(hours=8, minutes=15)
+    assert list(closed_bars(lagging, "4h", now).index) == [t0]
+    assert list(closed_bars(lagging, "4h", now + pd.Timedelta(hours=7)).index) == [t0, t0 + pd.Timedelta(hours=4)]

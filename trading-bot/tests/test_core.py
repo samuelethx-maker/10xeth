@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tradingbot import data, indicators as ind
+from tradingbot import data
+from tradingbot import indicators as ind
 from tradingbot.backtest import run_backtest
 from tradingbot.brokers.paper import PaperBroker
 from tradingbot.instruments import get_instrument
@@ -162,3 +163,25 @@ def test_long_only_filter():
     wf = walk_forward(b, get_instrument("XAUUSD"), "trend", 2000, 1000,
                       grid={"entry_n": [20]}, long_only=True, min_train_trades=1)
     assert all(t.direction == 1 for t in wf.oos.trades)
+
+
+def test_tsmom_signals_causal_and_agreeing():
+    from tradingbot.strategies import TimeSeriesMomentum
+
+    b = data.synthetic(3000, freq="1D", seed=12)
+    s = TimeSeriesMomentum()
+    full, part = s.generate(b), s.generate(b.iloc[:2000])
+    pd.testing.assert_frame_equal(full.iloc[:2000], part)
+    assert (full["entry"].iloc[:252] == 0).all()  # needs the full long lookback first
+    up = (b["close"] / b["close"].shift(21) > 1) & (b["close"] / b["close"].shift(63) > 1) & (b["close"] / b["close"].shift(252) > 1)
+    assert ((full["entry"] == 1) == up).iloc[252:].all()
+
+
+def test_bootstrap_pf_brackets_point_estimate():
+    from tradingbot.metrics import bootstrap_pf
+
+    rng = np.random.default_rng(1)
+    pnls = rng.normal(50, 1000, 400)
+    lo, hi = bootstrap_pf(pnls)
+    pf = pnls[pnls > 0].sum() / -pnls[pnls < 0].sum()
+    assert lo < pf < hi

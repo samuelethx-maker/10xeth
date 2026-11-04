@@ -20,13 +20,26 @@ No accounts or API keys needed; missing price data is downloaded on first use (o
 
 | Tab | What you can test |
 |---|---|
-| **Replay** | "What would the paper trader have done over the last 30/90/180/365 days?" Pick markets, strategy, timeframe, equity, risk per trade, long-only and the sit-out rule. Shows the equity curve, P&L by market, every trade, open positions, and the parameters chosen on prior data only. |
+| **Replay** | "What would the paper trader have done over the last 30/90/180/365 days?" Pick markets, strategy, timeframe, equity, risk per trade, long-only and the sit-out rule. Shows equity + drawdown charts, key statistics, monthly returns, P&L by market, a candlestick chart with entry/exit/stop markers (click any market or trade), a sortable/filterable trade list with CSV export, and the parameters chosen on prior data only. |
 | **Paper trading** | The live forward test: run a tick, see equity, today's P&L, drawdown, risk state, open positions, trades and parameters in use. Reset the account. |
 | **Backtest lab** | Walk-forward (out-of-sample) or fixed-parameter backtest for any market / strategy / timeframe, with acceptance gates and per-fold results. |
 | **Research** | `RESEARCH.md`: what has been tested and why the system does not pass yet. |
 | **Markets & risk** | Risk rules, cost assumptions and data freshness per market. |
 
 The **Kill switch** in the header blocks all new entries (same as creating the `KILL_SWITCH` file).
+See [docs/DASHBOARD.md](docs/DASHBOARD.md) for the API and details.
+
+## Connecting demo broker accounts
+
+Optional. See **[docs/BROKERS.md](docs/BROKERS.md)**: account setup (OANDA practice, Binance futures testnet,
+IBKR paper), `tradingbot broker-check`, and switching the paper trader from `execution: sim` to `dry_run` / `live`
+(orders sent to demo accounts through a reconciler with stop fail-safes, idempotent client ids and retries).
+
+## Quality checks
+
+`uv run pytest` (87 tests: engine fills/financing/limits, no-lookahead, walk-forward, replay = paper trader
+trade-for-trade, brokers against mocked APIs, reconciler, dashboard API) and `uvx ruff check tradingbot tests`.
+Both run in GitHub Actions on every push touching `trading-bot/` (`.github/workflows/trading-bot.yml`).
 
 ## Setup
 
@@ -89,7 +102,8 @@ Tests check that a run interrupted and resumed through the saved state produces 
 - 0.75% of equity risked per trade (stop distance x size), capped by max leverage
 - Daily loss limit of 3% from the day's starting equity: flatten and no new entries until the next UTC day
 - Max drawdown of 20% from peak: halt (permanent until a human resets it)
-- Portfolio: at most 4 open positions, and at most 2 per correlated group (crypto, US indices, metals, JPY)
+- Portfolio: at most 4 open positions, at most 2 per correlated group (crypto, US indices, metals, JPY),
+  and total open notional at most 5× equity
 - Kill switch: create a file `trading-bot/KILL_SWITCH` to block all new entries
 
 ## Backtest model
@@ -114,14 +128,15 @@ tradingbot/
   instruments.py   specs + cost assumptions
   data.py          CSV I/O, synthetic data, Binance/OANDA/IBKR downloads
   indicators.py    causal indicators (EMA, ATR, Donchian, Bollinger, RSI)
-  strategies/      trend breakout, mean reversion, EMA momentum (Strategy interface)
+  strategies/      trend breakout, mean reversion, EMA momentum, time-series momentum
   walkforward.py   rolling train/test optimisation, robustness diagnostics, resampling
   paper.py         simulated paper trader (live free data, persisted state, report) + replay
   dashboard.py     local web server + JSON API for the browser UI (web/index.html)
   risk.py          position sizing, daily loss / drawdown limits, kill switch
   backtest.py      Engine (shared by backtest / portfolio / paper), financing
   metrics.py       stats + acceptance gates
-  brokers/         paper, oanda, binance, ibkr adapters
+  brokers/         paper, oanda, binance, ibkr adapters (retries, client ids, stop fail-safe)
+  execution.py     reconciler: makes demo-broker positions match the Engine
 ```
 
 ## Roadmap

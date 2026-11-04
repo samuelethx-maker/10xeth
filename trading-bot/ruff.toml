@@ -1,0 +1,17 @@
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "BLE", "RUF", "PERF"]
+ignore = [
+  "E501",    # long table/format lines are deliberate
+  "RUF001",  # unicode dashes/arrows in user-facing strings
+  "RUF002",
+  "RUF003",
+  "E741",    # o/h/l/c are the conventional OHLC names
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["B", "BLE"]
+# Process boundaries: a failed job/tick/download must be reported, not crash the server or loop.
+"tradingbot/{dashboard,paper,cli}.py" = ["BLE001"]
