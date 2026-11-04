@@ -53,5 +53,6 @@ def format_table(rows: list[dict]) -> str:
         return "(no results)"
     df = pd.DataFrame(rows)
     cols = ["symbol", "strategy", "segment", "trades", "return_pct", "max_dd_pct",
-            "profit_factor", "win_rate_pct", "avg_r", "sharpe", "accepted"]
+            "profit_factor", "win_rate_pct", "avg_r", "sharpe", "folds", "pos_folds_pct",
+            "plateau", "neighbour", "accepted"]
     return df[[c for c in cols if c in df.columns]].round(2).to_string(index=False)

@@ -123,3 +123,42 @@ def test_full_pipeline_runs_on_synthetic():
         m = compute(res)
         assert m["trades"] > 0
         assert np.isfinite(res.equity).all()
+
+
+def test_resample_ohlc():
+    from tradingbot.walkforward import resample
+
+    b = bars_from(list(range(100, 108)), spread=0.0)
+    r = resample(b, "4h")
+    assert len(r) == 2
+    assert r["open"].iloc[0] == b["open"].iloc[0] and r["close"].iloc[0] == b["close"].iloc[3]
+    assert r["high"].iloc[1] == b["high"].iloc[4:8].max()
+
+
+def test_walk_forward_uses_only_past_for_selection():
+    from tradingbot.walkforward import walk_forward
+
+    b = data.synthetic(6000, start_price=2000, seed=4)
+    inst = get_instrument("XAUUSD")
+    grid = {"fast": [10, 20], "slow": [100, 200]}
+    wf = walk_forward(b, inst, "momentum", train=2000, test=1000, grid=grid, min_train_trades=1)
+    assert len(wf.folds) == 4
+    # test windows are contiguous, non-overlapping and start right after training
+    for f in wf.folds:
+        assert f.train_start < f.test_start
+    assert wf.oos.equity.index.is_monotonic_increasing
+    assert wf.oos.equity.index[0] == b.index[2000]
+    # changing data AFTER fold 1's training window must not change fold 1's choice
+    b2 = b.copy()
+    b2.iloc[2000:, :4] = b2.iloc[2000:, :4] * 1.5
+    wf2 = walk_forward(b2, inst, "momentum", train=2000, test=1000, grid=grid, min_train_trades=1)
+    assert wf2.folds[0].params == wf.folds[0].params
+
+
+def test_long_only_filter():
+    from tradingbot.walkforward import walk_forward
+
+    b = data.synthetic(4000, start_price=2000, seed=5)
+    wf = walk_forward(b, get_instrument("XAUUSD"), "trend", 2000, 1000,
+                      grid={"entry_n": [20]}, long_only=True, min_train_trades=1)
+    assert all(t.direction == 1 for t in wf.oos.trades)

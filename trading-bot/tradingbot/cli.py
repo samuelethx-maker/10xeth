@@ -3,6 +3,7 @@
   tradingbot backtest --symbol XAUUSD --strategy trend --data data/XAUUSD_1h.csv
   tradingbot backtest --all --synthetic          # smoke test the pipeline, no data needed
   tradingbot download --symbol BTCUSDT --days 1095
+  tradingbot walkforward --symbol BTCUSDT --timeframe 4h --strategy all
   tradingbot instruments
 """
 
@@ -17,6 +18,7 @@ from .backtest import run_backtest
 from .instruments import INSTRUMENTS, get_instrument
 from .risk import RiskConfig
 from .strategies import STRATEGIES
+from .walkforward import resample, walk_forward
 
 DEFAULT_PRICES = {"GBPJPY": 190, "USDJPY": 150, "XAUUSD": 2000, "XAGUSD": 25, "NAS100USD": 16000,
                   "US30": 38000, "BTCUSDT": 40000, "ETHUSDT": 2500, "ES": 5000, "MES": 5000}
@@ -68,6 +70,52 @@ def cmd_backtest(args) -> int:
     return 0
 
 
+def cmd_walkforward(args) -> int:
+    risk = RiskConfig.load(args.config)
+    symbols = list(INSTRUMENTS) if args.all else [get_instrument(args.symbol).symbol]
+    strategies = list(STRATEGIES) if args.strategy == "all" else [args.strategy]
+    bars_per_day = {"1h": 24, "4h": 6, "1D": 1}[args.timeframe]
+    rows = []
+    for sym in symbols:
+        inst = get_instrument(sym)
+        bars = _bars_for(sym, args)
+        if bars is None:
+            continue
+        if args.timeframe != "1h":
+            bars = resample(bars, args.timeframe)
+        train, test = int(args.train_days * bars_per_day), int(args.test_days * bars_per_day)
+        for sname in strategies:
+            wf = walk_forward(bars, inst, sname, train, test, risk=risk, equity=args.equity,
+                              long_only=args.long_only, usd_quote_rate=args.usdjpy)
+            if not wf.folds:
+                print(f"[skip] {sym} {sname}: not enough history for one fold")
+                continue
+            m = metrics.compute(wf.oos)
+            folds = wf.folds_frame()
+            m.update(
+                segment=f"WF {args.timeframe}{' L' if args.long_only else ''}",
+                folds=len(folds),
+                pos_folds_pct=float((folds["test_return_pct"] > 0).mean() * 100),
+                plateau=float(folds["plateau"].mean()),
+                neighbour=float(folds["neighbour"].mean()),
+                accepted=all(metrics.acceptance(m).values()),
+            )
+            rows.append(m)
+            if args.out:
+                out = Path(args.out)
+                out.mkdir(parents=True, exist_ok=True)
+                tag = f"{sym}_{sname}_{args.timeframe}{'_long' if args.long_only else ''}"
+                folds.to_csv(out / f"{tag}_folds.csv", index=False)
+                wf.oos.trades_frame().to_csv(out / f"{tag}_trades.csv", index=False)
+                wf.oos.equity.to_csv(out / f"{tag}_equity.csv")
+    if args.synthetic:
+        print("NOTE: synthetic random-walk data - these numbers only prove the pipeline runs.\n")
+    print(metrics.format_table(rows))
+    print(f"\nOut-of-sample only (stitched test windows). Acceptance: PF>{metrics.ACCEPTANCE['profit_factor']}, "
+          f"maxDD<{metrics.ACCEPTANCE['max_drawdown']:.0%}, trades>={metrics.ACCEPTANCE['min_trades']}")
+    return 0
+
+
 def cmd_download(args) -> int:
     symbols = list(INSTRUMENTS) if args.all else [args.symbol]
     for sym in symbols:
@@ -107,6 +155,23 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--config", default=str(Path(__file__).resolve().parent.parent / "config" / "settings.yaml"))
     b.add_argument("--trades-out", help="directory for out-of-sample trade logs")
     b.set_defaults(fn=cmd_backtest)
+
+    w = sub.add_parser("walkforward", help="walk-forward optimisation (out-of-sample only)")
+    w.add_argument("--symbol", default="BTCUSDT")
+    w.add_argument("--all", action="store_true")
+    w.add_argument("--strategy", default="all", choices=["all", *STRATEGIES])
+    w.add_argument("--timeframe", default="4h", choices=["1h", "4h", "1D"])
+    w.add_argument("--train-days", type=float, default=365)
+    w.add_argument("--test-days", type=float, default=90)
+    w.add_argument("--long-only", action="store_true")
+    w.add_argument("--data")
+    w.add_argument("--synthetic", action="store_true")
+    w.add_argument("--bars", type=int, default=20_000)
+    w.add_argument("--equity", type=float, default=100_000)
+    w.add_argument("--usdjpy", type=float, default=150.0)
+    w.add_argument("--config", default=str(Path(__file__).resolve().parent.parent / "config" / "settings.yaml"))
+    w.add_argument("--out", help="directory for fold / trade / equity CSVs")
+    w.set_defaults(fn=cmd_walkforward)
 
     d = sub.add_parser("download")
     d.add_argument("--symbol", default="BTCUSDT")

@@ -24,7 +24,10 @@ uv run tradingbot backtest --all --synthetic          # pipeline smoke test (mea
 uv run tradingbot download --symbol BTCUSDT           # public data, no key needed
 uv run tradingbot download --all                      # OANDA needs keys, ES needs TWS running
 uv run tradingbot backtest --symbol BTCUSDT --data data/BTCUSDT_1h.csv --trades-out results
+uv run tradingbot walkforward --symbol BTCUSDT --timeframe 4h --out results/wf   # out-of-sample only
 ```
+
+Research results and decisions are logged in [RESEARCH.md](RESEARCH.md).
 
 Each backtest reports in-sample (first 70%) and out-of-sample (last 30%) separately.
 Only out-of-sample numbers count.
@@ -70,7 +73,8 @@ tradingbot/
   instruments.py   specs + cost assumptions
   data.py          CSV I/O, synthetic data, Binance/OANDA/IBKR downloads
   indicators.py    causal indicators (EMA, ATR, Donchian, Bollinger, RSI)
-  strategies/      trend breakout, mean reversion (Strategy interface)
+  strategies/      trend breakout, mean reversion, EMA momentum (Strategy interface)
+  walkforward.py   rolling train/test optimisation, robustness diagnostics, resampling
   risk.py          position sizing, daily loss / drawdown limits, kill switch
   backtest.py      bar-by-bar engine
   metrics.py       stats + acceptance gates
@@ -81,6 +85,7 @@ tradingbot/
 
 1. ✅ Engine, risk, backtester, broker adapters, baseline strategies
 2. Get data for all 9 instruments (OANDA practice key, IBKR paper + TWS)
-3. Walk-forward optimisation, parameter-stability checks, per-instrument session filters
+3. ✅ Walk-forward optimisation + robustness diagnostics; crypto research done (see RESEARCH.md)
+   ⏳ Validate the 4h trend candidate on OANDA instruments and ES; model funding; portfolio backtest
 4. Live paper runner (scheduler, reconciliation, daily report, alerts)
 5. 4–8 weeks of paper trading, then compare against the backtest
