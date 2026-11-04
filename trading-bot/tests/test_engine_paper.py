@@ -1,0 +1,229 @@
+import json
+
+import pandas as pd
+import pytest
+
+from tradingbot import data
+from tradingbot.backtest import Engine, Leg, financing_per_bar, run_backtest, run_legs
+from tradingbot.instruments import get_instrument
+from tradingbot.paper import PaperConfig, PaperTrader, closed_bars
+from tradingbot.risk import RiskConfig
+from tradingbot.strategies import STRATEGIES, Strategy
+from tradingbot.walkforward import resample
+
+
+def _leg(sym, n=3000, seed=1, price=2000, strategy="trend"):
+    b = resample(data.synthetic(n * 4, start_price=price, seed=seed), "4h")
+    return Leg.build(get_instrument(sym), b, STRATEGIES[strategy]().generate(b), financing=False)
+
+
+def test_financing_charges_elapsed_time_and_funding_events():
+    inst = get_instrument("XAUUSD")
+    idx = pd.DatetimeIndex(["2024-01-05 16:00", "2024-01-05 20:00", "2024-01-08 00:00"], tz="UTC")
+    fl, fs = financing_per_bar(inst, idx)
+    assert fl[0] == 0 and fl[1] == pytest.approx(0.06 * 4 / 8760)
+    assert fl[2] == pytest.approx(0.06 * 52 / 8760)  # weekend is charged
+    assert (fs == 0).all()
+    f = pd.Series([0.001, 0.002], index=pd.DatetimeIndex(["2024-01-05 18:00", "2024-01-06 00:00"], tz="UTC"))
+    fl, fs = financing_per_bar(get_instrument("BTCUSDT"), idx, f)
+    assert list(fl) == [0, 0.001, 0.002] and list(fs) == [0, -0.001, -0.002]
+
+
+def test_financing_reduces_long_pnl():
+    b = resample(data.synthetic(8000, start_price=2000, seed=3), "4h")
+    sig = Strategy.empty_signals(b.index)
+    sig.iloc[10, 0] = 1
+    sig["stop_dist"] = 1500.0  # effectively never stopped
+    inst = get_instrument("XAUUSD")
+    with_fin = run_backtest(b, sig, inst, 10_000_000, financing=True).trades[0]
+    no_fin = run_backtest(b, sig, inst, 10_000_000, financing=False).trades[0]
+    assert with_fin.financing > 0
+    assert with_fin.pnl == pytest.approx(no_fin.pnl - with_fin.financing)
+
+
+def test_portfolio_respects_position_limits():
+    legs = [_leg(s, seed=i, price=p) for i, (s, p) in enumerate(
+        [("XAUUSD", 2000), ("XAGUSD", 25), ("NAS100USD", 16000), ("US30", 38000), ("BTCUSDT", 40000)])]
+    risk = RiskConfig(max_open_positions=2, max_per_group=1)
+    eng = Engine(risk, 100_000)
+    all_t = legs[0].times
+    for leg in legs[1:]:
+        all_t = all_t.union(leg.times)
+    idx = [leg.times.get_indexer(all_t) for leg in legs]
+    max_open = 0
+    for k, t in enumerate(all_t):
+        eng.step(t, [(leg, int(ix[k])) for leg, ix in zip(legs, idx) if ix[k] >= 0])
+        max_open = max(max_open, len(eng.pos))
+        groups = [get_instrument(s).group for s in eng.pos]
+        assert len(groups) == len(set(groups))
+    assert max_open == 2
+    assert len(eng.trades) > 0
+
+
+def test_engine_state_roundtrip_matches_single_run():
+    """Running in two halves with JSON serialisation in between (as the paper
+    trader does) must give exactly the same trades as one continuous run."""
+    legs = [_leg("XAUUSD", seed=5), _leg("BTCUSDT", seed=6, price=40000, strategy="meanrev")]
+    risk = RiskConfig()
+    full = run_legs(legs, Engine(risk, 100_000), close_at_end=False)
+
+    cut = legs[0].times[len(legs[0].times) // 2]
+    e1 = Engine(risk, 100_000)
+    run_legs([_slice(l, l.times <= cut) for l in legs], e1, close_at_end=False)
+    e2 = Engine.from_dict(json.loads(json.dumps(e1.to_dict())), risk)
+    e2.record_equity = True
+    run_legs([_slice(l, l.times > cut) for l in legs], e2, close_at_end=False)
+    trades = e1.trades + e2.trades
+    assert len(trades) == len(full.trades) > 0
+    for a, b in zip(trades, full.trades):
+        assert a.symbol == b.symbol and a.entry_time == b.entry_time and a.pnl == pytest.approx(b.pnl)
+    assert e2.equity() == pytest.approx(full.equity())
+
+
+def _slice(leg: Leg, mask) -> Leg:
+    return leg.slice(mask)
+
+
+def test_closed_bars_drops_incomplete():
+    b = data.synthetic(30, freq="1h")
+    now = b.index[0] + pd.Timedelta(hours=10, minutes=5)
+    cb = closed_bars(b, "4h", now)
+    assert list(cb.index) == [b.index[0], b.index[4]]  # 08:00 bar not finished until 12:00
+
+
+def test_paper_trader_ticks_and_persists(tmp_path):
+    full = data.synthetic(24 * 500, start_price=2000, seed=11)
+    clock = {"now": full.index[0] + pd.Timedelta(days=420)}
+
+    def fetch(inst, days):
+        return full[full.index < clock["now"]]
+
+    cfg = PaperConfig(legs=["XAUUSD"], train_days=365, refit_days=90, state_dir=str(tmp_path))
+    pt = PaperTrader(cfg, fetch=fetch, fetch_fund=lambda i, s: None, log=lambda m: None)
+    s0 = pt.tick(clock["now"])
+    assert s0["new_bars"] == 0  # first tick only initialises
+    assert pt.state["params"]["XAUUSD"]["params"] is not None
+    for _ in range(60):  # ~60 days of daily ticks, restarting the trader each time
+        clock["now"] += pd.Timedelta(days=1)
+        pt = PaperTrader(cfg, fetch=fetch, fetch_fund=lambda i, s: None, log=lambda m: None)
+        pt.tick(clock["now"])
+    eq = pd.read_csv(tmp_path / "equity.csv")
+    assert len(eq) == 60 * 6  # one point per 4h bar, no gaps or duplicates
+    assert pd.to_datetime(eq["time"]).is_monotonic_increasing
+    assert (tmp_path / "report.md").read_text().startswith("# Paper trading report")
+
+
+def test_replay_matches_paper_trader(tmp_path):
+    """Replay must reproduce what the tick-by-tick paper trader does."""
+    from tradingbot.paper import replay
+
+    full = data.synthetic(24 * 520, start_price=2000, seed=21)
+    start = full.index[0] + pd.Timedelta(days=420)
+    end = start + pd.Timedelta(days=60)
+    cfg = PaperConfig(legs=["XAUUSD"], train_days=365, refit_days=90, state_dir=str(tmp_path))
+
+    clock = {"now": start}
+    def fetch(inst, days):
+        return full[full.index < clock["now"]]
+
+    pt = PaperTrader(cfg, fetch=fetch, fetch_fund=lambda i, s: None, log=lambda m: None)
+    pt.tick(start)
+    while clock["now"] < end:
+        clock["now"] += pd.Timedelta(hours=4)
+        pt.tick(clock["now"])
+    paper_trades = pd.read_csv(tmp_path / "trades.csv") if (tmp_path / "trades.csv").exists() else pd.DataFrame()
+
+    # replay window starts right after the bar the paper trader initialised on
+    out = replay(cfg, days=60, end=end, loader=lambda inst: full[full.index < end], log=lambda m: None)
+    assert out["fits"][0]["params"] == pt.state["params"]["XAUUSD"]["params"]
+    rt = out["result"].trades
+    assert len(rt) == len(paper_trades) > 0
+    for a, (_, b) in zip(rt, paper_trades.iterrows()):
+        assert a.entry_time == pd.Timestamp(b.entry_time) and a.pnl == pytest.approx(b.pnl)
+    assert out["engine"].equity() == pytest.approx(pt.state["engine_obj"].equity())
+
+
+def test_sit_out_rule_blocks_negative_training():
+    from tradingbot.walkforward import _grid, select_params, strategy_signals
+
+    b = resample(data.synthetic(24 * 400, start_price=2000, seed=8), "4h")
+    inst = get_instrument("XAUUSD")
+    combos = _grid({"entry_n": [20, 55]})
+    sigs = strategy_signals("trend", combos, b, False)
+    loose = select_params(b, slice(0, len(b)), inst, sigs, combos, {"entry_n": [20, 55]}, min_train_trades=1)
+    strict = select_params(b, slice(0, len(b)), inst, sigs, combos, {"entry_n": [20, 55]}, min_train_trades=1,
+                           min_score=loose["score"] + 1)
+    assert loose["best"] is not None and strict["best"] is None
+
+
+def test_gbpjpy_uses_per_bar_usdjpy_series():
+    from tradingbot.backtest import _usdjpy_for
+
+    idx = pd.date_range("2024-01-01", periods=5, freq="4h", tz="UTC")
+    ref = pd.Series([140.0, 141.0, 150.0], index=pd.DatetimeIndex(["2023-12-31", "2024-01-01 04:00", "2024-01-01 12:00"], tz="UTC"))
+    fx = _usdjpy_for(get_instrument("GBPJPY"), idx, ref)
+    assert list(fx) == [140.0, 141.0, 141.0, 150.0, 150.0]
+    assert _usdjpy_for(get_instrument("USDJPY"), idx, ref) is None
+    assert _usdjpy_for(get_instrument("XAUUSD"), idx, ref) is None
+
+
+def test_no_entry_queued_on_bar_when_daily_limit_trips():
+    """A daily-limit breach on the last bar of a day must not open a new trade at the next day's open."""
+    inst = get_instrument("XAUUSD")
+    idx = pd.date_range("2024-01-01 12:00", periods=6, freq="4h", tz="UTC")  # 12,16,20 | 00,04,08
+    closes = [2000, 2000, 1900, 1900, 1900, 1900]
+    b = pd.DataFrame({"open": [2000, 2000, 2000, 1900, 1900, 1900], "high": [2001, 2001, 2001, 1901, 1901, 1901],
+                      "low": [1999, 1999, 1899, 1899, 1899, 1899], "close": closes, "volume": 1.0}, index=idx)
+    sig = Strategy.empty_signals(idx)
+    sig["entry"] = [1, 0, 1, 0, 0, 0]
+    sig["stop_dist"] = 500.0  # far stop so the loss shows up as open P&L
+    res = run_backtest(b, sig, inst, 100_000, RiskConfig(risk_per_trade=0.2, daily_loss_limit=0.03, max_drawdown=0.9),
+                       financing=False)
+    assert any("daily loss" in e for e in res.risk_events)
+    assert len(res.trades) == 1  # the 20:00 signal on the breach bar was not acted on next day
+
+
+def test_gross_leverage_cap_limits_new_positions():
+    legs = [_leg(s, seed=i, price=p) for i, (s, p) in enumerate([("XAUUSD", 2000), ("NAS100USD", 16000), ("BTCUSDT", 40000)])]
+    eng = Engine(RiskConfig(max_gross_leverage=1.0, risk_per_trade=0.05), 100_000)
+    all_t = legs[0].times.union(legs[1].times).union(legs[2].times)
+    idx = [leg.times.get_indexer(all_t) for leg in legs]
+    worst = 0.0
+    for k, t in enumerate(all_t):
+        rows = [(leg, int(ix[k])) for leg, ix in zip(legs, idx) if ix[k] >= 0]
+        eng.step(t, rows)
+        worst = max(worst, eng.gross_notional() / eng.equity())
+    assert len(eng.trades) > 0
+    assert worst < 1.0 * 1.15  # cap applied at entry; later price moves can drift it slightly
+
+
+def test_closed_bars_waits_for_lagging_feed():
+    b = data.synthetic(30, freq="1h")
+    t0 = b.index[0]
+    lagging = b[b.index < t0 + pd.Timedelta(hours=7)]  # 06:00 bar of the 04-08 bucket missing
+    now = t0 + pd.Timedelta(hours=8, minutes=15)
+    assert list(closed_bars(lagging, "4h", now).index) == [t0]
+    assert list(closed_bars(lagging, "4h", now + pd.Timedelta(hours=7)).index) == [t0, t0 + pd.Timedelta(hours=4)]
+
+
+def test_fetch_live_falls_back_to_yahoo_when_binance_blocked(monkeypatch):
+    import requests
+
+    from tradingbot import paper
+
+    def blocked(*a, **k):
+        raise requests.HTTPError("451 Client Error: restricted location")
+
+    calls = {}
+
+    def yahoo(ticker, interval, period):
+        calls["ticker"] = ticker
+        return data.synthetic(10)
+
+    monkeypatch.setattr(paper.data, "download_binance", blocked)
+    monkeypatch.setattr(paper.data, "download_yahoo", yahoo)
+    monkeypatch.setattr(paper.data, "download_funding", blocked)
+    monkeypatch.setattr(paper.data, "load_funding", lambda sym: None)
+    inst = get_instrument("BTCUSDT")
+    assert len(paper.fetch_live(inst, 30)) == 10 and calls["ticker"] == "BTC-USD"
+    assert paper.fetch_funding(inst, pd.Timestamp("2024-01-01", tz="UTC")) is None

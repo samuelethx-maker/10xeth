@@ -1,0 +1,24 @@
+# Simulated paper trading (tradingbot paper). No broker account needed.
+# Strategy choice is pre-committed from RESEARCH.md; parameters are re-fitted
+# every refit_days on the last train_days, exactly like the walk-forward test.
+strategy: trend
+timeframe: 4h
+long_only: false
+equity: 100000
+train_days: 365
+refit_days: 90
+history_days: 540      # 1h history fetched per tick (fit window + indicator warm-up)
+state_dir: results/paper
+execution: sim         # sim | dry_run (log intended orders) | live (orders on DEMO accounts; see docs/BROKERS.md)
+delay_minutes: 15      # Yahoo futures quotes are delayed ~10 min
+
+# MES (Micro E-mini, $5/pt) instead of ES ($50/pt): at $100k and 0.75% risk an ES
+# contract almost never fits the risk budget. Switch to ES with equity >= ~$500k.
+legs: [GBPJPY, USDJPY, XAUUSD, XAGUSD, NAS100USD, US30, BTCUSDT, ETHUSDT, MES]
+
+risk:
+  risk_per_trade: 0.0075
+  daily_loss_limit: 0.03
+  max_drawdown: 0.20
+  max_open_positions: 4
+  max_per_group: 2
