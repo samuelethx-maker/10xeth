@@ -154,3 +154,19 @@ the earlier finding: the edge is concentrated in crypto and metals, and is too t
 on the first bar of each tick (in practice every 4h bar), so its P&L would have been too optimistic compared with the
 backtests. Financing is now computed over the full history before slicing, and a test checks that the replay and the
 paper trader produce identical trades and equity.
+
+## 2026-11-04: Phase 4 pre-registration (written before any test is run)
+
+**Hypothesis H4:** multi-horizon *time-series momentum* (`tsmom`) on **daily** bars works across more of the 9
+markets than the 4h Donchian breakout, because it is the best-documented trend effect in futures literature
+(1-, 3- and 12-month horizons) and holds positions longer, so trading costs matter less.
+
+- Rule (fixed before testing): score = mean of sign(return over `lb_short`, 63, `lb_long` bars). Enter long when all three
+  agree up (score = +1) and short when all agree down; exit when the score turns ≤ 0 (long) or ≥ 0 (short).
+  Disaster stop = `stop_atr` × ATR(20). Position size from the same 0.75% risk-per-trade rule.
+- Grid (12 combos, chosen once): lb_short ∈ {10, 21, 42}, lb_long ∈ {126, 252}, stop_atr ∈ {3, 5}.
+- Test: walk-forward on daily bars, train 3 years, test 1 year, all 9 markets, then the shared-account
+  portfolio from 1999 to 2026, with financing. **Pass = portfolio PF > 1.3 and max DD < 15% with the 20% halt disabled**,
+  plus ≥ 100 trades. One run; no re-tuning after seeing the result.
+- Statistical check: 95% bootstrap confidence interval on portfolio PF (resampling trades). If the lower bound is ≤ 1.0,
+  the edge is not statistically distinguishable from zero, even if the point estimate passes.
