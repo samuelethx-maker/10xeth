@@ -1,0 +1,14 @@
+line-length = 120
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "BLE", "RUF", "PERF"]
+ignore = [
+  "E501",    # long table/format lines are deliberate
+  "RUF001",  # unicode dashes/arrows in user-facing strings
+  "RUF002",
+  "RUF003",
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["B", "BLE"]
