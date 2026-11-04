@@ -1,0 +1,5 @@
+risk:
+  risk_per_trade: 0.0075   # 0.75% of equity per trade
+  daily_loss_limit: 0.03   # flatten and stop for the day at -3%
+  max_drawdown: 0.20       # halt everything at -20% from peak
+  max_open_positions: 4
