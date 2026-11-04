@@ -4,3 +4,4 @@ risk:
   max_drawdown: 0.20       # halt everything at -20% from peak
   max_open_positions: 4    # portfolio-wide
   max_per_group: 2         # per correlation group (crypto, us_index, metals, jpy)
+  max_gross_leverage: 5.0  # total open notional across all positions / equity
