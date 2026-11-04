@@ -154,3 +154,70 @@ the earlier finding: the edge is concentrated in crypto and metals, and is too t
 on the first bar of each tick (in practice every 4h bar), so its P&L would have been too optimistic compared with the
 backtests. Financing is now computed over the full history before slicing, and a test checks that the replay and the
 paper trader produce identical trades and equity.
+
+## 2026-11-04: Phase 4 pre-registration (written before any test is run)
+
+**Hypothesis H4:** multi-horizon *time-series momentum* (`tsmom`) on **daily** bars works across more of the 9
+markets than the 4h Donchian breakout, because it is the best-documented trend effect in futures literature
+(1-, 3- and 12-month horizons) and holds positions longer, so trading costs matter less.
+
+- Rule (fixed before testing): score = mean of sign(return over `lb_short`, 63, `lb_long` bars). Enter long when all three
+  agree up (score = +1) and short when all agree down; exit when the score turns ≤ 0 (long) or ≥ 0 (short).
+  Disaster stop = `stop_atr` × ATR(20). Position size from the same 0.75% risk-per-trade rule.
+- Grid (12 combos, chosen once): lb_short ∈ {10, 21, 42}, lb_long ∈ {126, 252}, stop_atr ∈ {3, 5}.
+- Test: walk-forward on daily bars, train 3 years, test 1 year, all 9 markets, then the shared-account
+  portfolio from 1999 to 2026, with financing. **Pass = portfolio PF > 1.3 and max DD < 15% with the 20% halt disabled**,
+  plus ≥ 100 trades. One run; no re-tuning after seeing the result.
+- Statistical check: 95% bootstrap confidence interval on portfolio PF (resampling trades). If the lower bound is ≤ 1.0,
+  the edge is not statistically distinguishable from zero, even if the point estimate passes.
+
+### H4 result: **rejected** (`results/logs/h4_*`, run once as pre-registered)
+
+| Portfolio, daily 1999→2026, all 9, financing | Trades | Return | Max DD | PF | PF 95% CI |
+|---|---:|---:|---:|---:|---|
+| `tsmom`, 20% halt disabled | 604 | +18.4% | 27.1% | 1.10 | [0.79, 1.45] |
+| `tsmom`, 20% halt on | 101 | −14.9% | 20.1% | 0.45 | halted in 2006 |
+| baseline `trend`, halt disabled | 668 | +4.4% | 25.8% | 1.01 | [0.78, 1.29] |
+
+Time-series momentum beats the Donchian baseline (PF 1.10 vs 1.01), but it misses the gates on PF and drawdown, and
+its confidence interval includes break-even. Per market it repeats the earlier pattern: **gold is consistently positive**
+(walk-forward PF 1.46 over 115 trades, +$11.9k in the portfolio), silver is mildly positive, and US30/NAS100/USDJPY lose.
+
+### Where the research stands (and why I am stopping the strategy search here)
+
+Five strategy families × three timeframes × nine markets have now been tested. Each new idea tested is
+another chance to find something that only looks good by luck. Continuing to search until something passes would
+produce exactly the over-fitted "holy grail" backtest these gates exist to reject. The honest conclusion:
+
+- **There is no evidence that simple technical rules make reliable money across this 9-market basket after costs.**
+- The only consistent signals are **trend-following in gold (and to a lesser extent silver and crypto)**. These are
+  candidates for a focused forward test, not a proven edge. Picking them *after* seeing these results is
+  selection bias, so they must prove themselves on new data (paper trading) before anyone trusts them.
+- Next useful work is data and evidence, not more rules: longer hourly history (OANDA practice / Dukascopy), real
+  broker spreads from demo accounts, and 4–8 weeks of forward paper trading compared against the replay.
+
+## 2026-11-04: Independent code review and re-run
+
+An independent review of the engine found **no look-ahead bias** in signals, walk-forward folds or replay, and
+these defects, all now fixed and covered by tests:
+
+| Defect | Effect | Fix |
+|---|---|---|
+| GBPJPY P&L converted at a fixed USDJPY of 150 | USD P&L, sizing and costs off by up to ±9% | per-bar USDJPY bar *open* (causal) from cached data |
+| A daily-loss breach on a day's last bar could still queue an entry for the next day | trades on a day that should be blocked | no entries are queued on the bar a risk limit trips |
+| Walk-forward headline result restarted the account each fold | risk state (peak, halt) reset; positions force-closed at fold ends | one continuous account over the stitched test windows |
+| Leverage capped per position only | 4 positions could reach 4× the per-instrument cap | portfolio gross-leverage cap (5× equity) |
+| Max drawdown measured from the first bar, not the starting equity | an immediate loss was not counted | measured from the starting equity |
+| Sharpe annualised with √252 for 24/7 crypto | understated by ~17% | annualised by observed trading days per year |
+| Live feeds' still-forming last bar cached; a lagging feed could close a 4h bar early | partial bars in signals | unfinished bars dropped; 4h buckets wait for their last hour (6h grace) |
+| Dukascopy BID candles + half-spread | long entries filled at mid (too cheap) | shifted to approximate mid on download |
+
+**Re-run after the fixes:** headline numbers moved only slightly; **conclusions are unchanged**.
+
+| | Before | After fixes | PF 95% CI |
+|---|---|---|---|
+| Portfolio 4h trend, all 9, halt off | PF 1.09, DD 42.4% | PF 1.09, DD 42.4% | [0.80, 1.44] |
+| Portfolio daily tsmom, all 9, halt off | PF 1.10, DD 27.1% | PF 1.10, DD 27.2% | [0.78, 1.44] |
+| Paper-trader replay, last 365 days | +14.6%, PF 1.13 | +14.6%, PF 1.13 | [0.65, 1.79] |
+| ETHUSDT 4h trend walk-forward | PF 1.38, DD 13.9% | PF 1.35, DD 12.8% | |
+| BTCUSDT 4h trend walk-forward | PF 1.43, DD 16.9% | PF 1.42, DD 16.4% | |
