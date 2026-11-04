@@ -17,7 +17,7 @@ import uuid
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 import numpy as np
 import pandas as pd
@@ -34,6 +34,11 @@ ROOT = Path(__file__).resolve().parent.parent
 WEB = Path(__file__).resolve().parent / "web"
 SETTINGS = ROOT / "config" / "settings.yaml"
 PAPER_CFG = ROOT / "config" / "paper.yaml"
+
+MAX_BODY = 1_000_000          # reject larger request bodies
+MAX_BARS = 600                # candle cap per /api/candles response
+TIMEFRAMES = ("1h", "4h", "1D")
+AUTO_PAPER = False            # set by serve(); shown in the Paper tab
 
 
 # ------------------------------------------------------------------ helpers
@@ -53,14 +58,184 @@ def clean(o):
     return o
 
 
+def _sample_idx(n_total: int, n: int) -> np.ndarray:
+    if n_total <= n:
+        return np.arange(n_total)
+    return np.unique(np.linspace(0, n_total - 1, n).astype(int))
+
+
 def series(s: pd.Series, n: int = 600) -> dict:
-    if len(s) > n:
-        s = s.iloc[np.unique(np.linspace(0, len(s) - 1, n).astype(int))]
+    s = s.iloc[_sample_idx(len(s), n)]
     return {"t": [t.isoformat() for t in s.index], "v": [round(float(v), 2) for v in s.to_numpy()]}
 
 
-def trade_rows(trades: list[Trade], limit: int = 300) -> list[dict]:
+def drawdown_series(eq: pd.Series, n: int = 600) -> dict:
+    """Underwater curve in percent (<= 0), computed at full resolution then sampled."""
+    if not len(eq):
+        return {"t": [], "v": []}
+    dd = (eq / eq.cummax() - 1) * 100
+    s = dd.iloc[_sample_idx(len(dd), n)]
+    return {"t": [t.isoformat() for t in s.index], "v": [round(float(v), 3) for v in s.to_numpy()]}
+
+
+def trade_rows(trades: list[Trade], limit: int = 1500) -> list[dict]:
     return [{**t.to_dict(), "r": round(t.r_multiple, 2)} for t in trades[-limit:][::-1]]
+
+
+def parse_risk_events(events: list[str]) -> list[dict]:
+    """'<timestamp>: <message>' strings -> {t, kind, text} (kind: halt | daily_limit)."""
+    out = []
+    for e in events or []:
+        when, _, msg = str(e).partition(": ")
+        try:
+            t = pd.Timestamp(when)
+            t = t.tz_localize("UTC") if t.tzinfo is None else t.tz_convert("UTC")
+        except Exception:
+            continue
+        out.append({"t": t.isoformat(), "kind": "halt" if "halted" in msg else "daily_limit", "text": msg})
+    return out
+
+
+def monthly_returns(eq: pd.Series, initial: float) -> list[dict]:
+    """Calendar-month returns from month-end equity (first month vs initial equity)."""
+    if not len(eq):
+        return []
+    idx = eq.index.tz_convert("UTC").tz_localize(None) if eq.index.tz is not None else eq.index
+    end = pd.Series(eq.to_numpy(), index=idx.to_period("M")).groupby(level=0).last()
+    prev = end.shift(1)
+    prev.iloc[0] = initial
+    return [{"y": p.year, "m": p.month, "ret": round(float((end[p] / prev[p] - 1) * 100), 3),
+             "pnl": round(float(end[p] - prev[p]), 2)} for p in end.index]
+
+
+def perf_stats(eq: pd.Series, trades: list[Trade], initial: float) -> dict:
+    """Headline statistics from the equity curve and closed trades."""
+    pnls = np.array([t.pnl for t in trades], dtype=float)
+    wins, losses = pnls[pnls > 0], pnls[pnls < 0]
+    gross_loss = -losses.sum()
+    pf = float(wins.sum() / gross_loss) if gross_loss > 0 else (float("inf") if len(wins) else 0.0)
+    final = float(eq.iloc[-1]) if len(eq) else initial
+    years = (eq.index[-1] - eq.index[0]).total_seconds() / (365.25 * 86400) if len(eq) > 1 else 0.0
+    cagr = ((final / initial) ** (1 / years) - 1) * 100 if years >= 1 / 365.25 and final > 0 and initial > 0 else None
+    daily = eq.resample("1D").last().dropna().pct_change().dropna() if len(eq) > 1 else pd.Series(dtype=float)
+    sharpe = float(daily.mean() / daily.std() * np.sqrt(252)) if len(daily) > 1 and daily.std() > 0 else 0.0
+    max_dd = float(-(eq / eq.cummax() - 1).min() * 100) if len(eq) else 0.0
+    streak = best = 0
+    for t in sorted(trades, key=lambda t: t.exit_time or pd.Timestamp.max.tz_localize("UTC")):
+        streak = streak + 1 if t.pnl < 0 else 0
+        best = max(best, streak)
+    exposure = None
+    if len(eq) > 1:
+        t0, t1 = eq.index[0], eq.index[-1]
+        spans = sorted((max(t.entry_time, t0), min(t.exit_time or t1, t1)) for t in trades)
+        covered, cur = pd.Timedelta(0), None
+        for a, b in spans:
+            if b <= a:
+                continue
+            if cur is None or a > cur[1]:
+                covered += (cur[1] - cur[0]) if cur else pd.Timedelta(0)
+                cur = [a, b]
+            else:
+                cur[1] = max(cur[1], b)
+        covered += (cur[1] - cur[0]) if cur else pd.Timedelta(0)
+        exposure = float(covered / (t1 - t0) * 100) if t1 > t0 else None
+    avg_win = float(wins.mean()) if len(wins) else 0.0
+    avg_loss = float(losses.mean()) if len(losses) else 0.0
+    return {"trades": len(pnls), "net_pnl": float(pnls.sum()), "cagr_pct": cagr, "sharpe": sharpe,
+            "max_dd_pct": max_dd, "profit_factor": pf,
+            "win_rate_pct": float(len(wins) / len(pnls) * 100) if len(pnls) else 0.0,
+            "avg_win": avg_win, "avg_loss": avg_loss,
+            "payoff": abs(avg_win / avg_loss) if avg_loss else None,
+            "expectancy": float(pnls.mean()) if len(pnls) else 0.0,
+            "expectancy_r": float(np.mean([t.r_multiple for t in trades])) if trades else 0.0,
+            "best_trade": float(pnls.max()) if len(pnls) else 0.0,
+            "worst_trade": float(pnls.min()) if len(pnls) else 0.0,
+            "longest_losing_streak": best, "exposure_pct": exposure}
+
+
+def analytics(res, initial: float) -> dict:
+    return {"stats": perf_stats(res.equity, res.trades, initial), "monthly": monthly_returns(res.equity, initial),
+            "drawdown": drawdown_series(res.equity), "risk_events_parsed": parse_risk_events(res.risk_events)}
+
+
+def candles(symbol: str, tf: str = "4h", start: str | None = None, end: str | None = None,
+            limit: int = MAX_BARS) -> dict:
+    """OHLC bars from the cached 1h history, resampled; at most `limit` (the latest) bars."""
+    if symbol not in INSTRUMENTS:
+        raise ValueError(f"unknown symbol {symbol!r}")
+    if tf not in TIMEFRAMES:
+        raise ValueError(f"tf must be one of {', '.join(TIMEFRAMES)}")
+    limit = max(10, min(MAX_BARS, int(limit)))
+    bars = data.load_symbol(symbol, "", "1h")
+    if bars is None or bars.empty:
+        raise LookupError(f"no cached price data for {symbol}")
+    if tf != "1h":
+        bars = resample(bars, tf)
+    for val, lo in ((start, True), (end, False)):
+        if val:
+            ts = _parse_ts(val)
+            bars = bars[bars.index >= ts] if lo else bars[bars.index <= ts]
+    truncated = len(bars) > limit
+    bars = bars.iloc[-limit:]
+    rnd = lambda col: [round(float(v), 6) for v in bars[col].to_numpy()]  # noqa: E731
+    return {"symbol": symbol, "tf": tf, "truncated": truncated, "n": len(bars),
+            "t": [t.isoformat() for t in bars.index],
+            "o": rnd("open"), "h": rnd("high"), "l": rnd("low"), "c": rnd("close")}
+
+
+def _parse_ts(val: str) -> pd.Timestamp:
+    if len(str(val)) > 40:
+        raise ValueError("bad timestamp")
+    try:
+        ts = pd.Timestamp(val)
+    except Exception:
+        raise ValueError(f"bad timestamp {val!r}") from None
+    if pd.isna(ts):
+        raise ValueError(f"bad timestamp {val!r}")
+    return ts.tz_localize("UTC") if ts.tzinfo is None else ts.tz_convert("UTC")
+
+
+def _clamped(name: str, v, lo: float, hi: float) -> float:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be a number") from None
+    if not math.isfinite(f) or not lo <= f <= hi:
+        raise ValueError(f"{name} must be between {lo:g} and {hi:g}")
+    return f
+
+
+def validate_replay(body: dict) -> dict:
+    out = dict(body)
+    if body.get("strategy") and body["strategy"] not in STRATEGIES:
+        raise ValueError(f"unknown strategy {body['strategy']!r}")
+    if body.get("timeframe") and body["timeframe"] not in TF_DELTA:
+        raise ValueError("timeframe must be 1h, 4h or 1D")
+    syms = body.get("symbols")
+    if syms is not None:
+        if not isinstance(syms, list) or not syms or len(syms) > 30 or not all(isinstance(x, str) for x in syms):
+            raise ValueError("symbols must be a non-empty list of market names")
+        for x in syms:
+            get_instrument(x)  # raises on unknown
+    if body.get("equity"):
+        out["equity"] = _clamped("equity", body["equity"], 1_000, 1e9)
+    if body.get("risk_per_trade"):
+        out["risk_per_trade"] = _clamped("risk_per_trade", body["risk_per_trade"], 0.05, 5)
+    if body.get("days"):
+        out["days"] = int(_clamped("days", body["days"], 14, 365))
+    return out
+
+
+def validate_backtest(body: dict) -> dict:
+    if body.get("symbol"):
+        get_instrument(str(body["symbol"]))
+    if body.get("strategy") and body["strategy"] not in STRATEGIES:
+        raise ValueError(f"unknown strategy {body['strategy']!r}")
+    if body.get("timeframe") and body["timeframe"] not in TIMEFRAMES:
+        raise ValueError("timeframe must be 1h, 4h or 1D")
+    if body.get("mode") and body["mode"] not in ("walkforward", "fixed"):
+        raise ValueError("mode must be walkforward or fixed")
+    return dict(body)
 
 
 def by_symbol(trades: list[Trade]) -> list[dict]:
@@ -183,6 +358,7 @@ def job_replay(body: dict, log) -> dict:
         "risk": risk_state(eng), "config": {"strategy": cfg.strategy, "timeframe": cfg.timeframe,
                                              "days": days, "legs": cfg.legs,
                                              "risk_per_trade": cfg.risk.risk_per_trade},
+        **analytics(res, cfg.equity),
     }
 
 
@@ -222,16 +398,29 @@ def job_backtest(body: dict, log) -> dict:
         res = run_backtest(bars, sig, inst, risk=risk, usd_quote_rate=150.0, funding=funding, strategy_name=strat)
     m = metrics.compute(res)
     return {"metrics": m, "accept": metrics.acceptance(m), "equity": series(res.equity),
-            "initial_equity": res.initial_equity, "trades": trade_rows(res.trades, 200), "folds": folds,
+            "initial_equity": res.initial_equity, "trades": trade_rows(res.trades), "by_symbol": by_symbol(res.trades), "folds": folds,
             "range": [bars.index[0], bars.index[-1]], "bars": len(bars),
+            "risk_events": res.risk_events, **analytics(res, res.initial_equity),
             "config": {"symbol": inst.symbol, "strategy": strat, "timeframe": tf, "mode": mode,
                        "long_only": long_only}}
+
+
+def last_tick_job() -> dict | None:
+    ticks = [j for j in JOBS.jobs.values() if j["kind"] == "paper_tick"]
+    if not ticks:
+        return None
+    j = max(ticks, key=lambda j: j["created"])
+    return {"status": j["status"], "created": j["created"], "log": j["log"][-30:], "error": j["error"]}
 
 
 def paper_status() -> dict:
     cfg = _paper_cfg()
     base = {"config": {"strategy": cfg.strategy, "timeframe": cfg.timeframe, "legs": cfg.legs,
-                       "equity": cfg.equity, "refit_days": cfg.refit_days, "train_days": cfg.train_days}}
+                       "equity": cfg.equity, "refit_days": cfg.refit_days, "train_days": cfg.train_days,
+                       "delay_minutes": cfg.delay_minutes},
+            "auto_paper": AUTO_PAPER, "server_time": pd.Timestamp.now(tz="UTC"), "last_tick_job": last_tick_job(),
+            "next_tick": (pd.Timestamp.now(tz="UTC").floor(TF_DELTA[cfg.timeframe]) + TF_DELTA[cfg.timeframe]
+                          + pd.Timedelta(minutes=cfg.delay_minutes))}
     if not (cfg.dir / "state.json").exists():
         return {**base, "initialised": False}
     pt = PaperTrader(cfg, log=lambda m: None)
@@ -248,9 +437,7 @@ def paper_status() -> dict:
             "open": open_rows(eng),
             "pending": [{"symbol": s, "side": "long" if v[0] == 1 else "short"} for s, v in eng.pending_entry.items()],
             "trades": trades, "equity": series(eq) if len(eq) else {"t": [], "v": []},
-            "params": pt.state["params"],
-            "next_tick": (pd.Timestamp.now(tz="UTC").floor(TF_DELTA[cfg.timeframe]) + TF_DELTA[cfg.timeframe]
-                          + pd.Timedelta(minutes=cfg.delay_minutes))}
+            "drawdown": drawdown_series(eq), "params": pt.state["params"]}
 
 
 def job_paper_tick(body: dict, log) -> dict:
@@ -300,14 +487,24 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy",
+                         "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+                         "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'")
         self.end_headers()
         self.wfile.write(body)
 
     def _json(self, obj, code: int = 200) -> None:
         self._send(code, json.dumps(clean(obj)).encode(), "application/json")
 
+    def _fail(self, e: Exception, code: int) -> None:
+        self._json({"error": f"{type(e).__name__}: {e}" if code >= 500 else str(e.args[0] if isinstance(e, KeyError) and e.args else e)}, code)
+
     def do_GET(self):
-        path = urlparse(self.path).path
+        url = urlparse(self.path)
+        path = url.path
         try:
             if path in ("/", "/index.html"):
                 return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
@@ -315,6 +512,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(overview())
             if path == "/api/paper":
                 return self._json(paper_status())
+            if path == "/api/candles":
+                q = {k: v[-1] for k, v in parse_qs(url.query, max_num_fields=12).items()}
+                if "symbol" not in q:
+                    raise ValueError("symbol is required")
+                return self._json(candles(q["symbol"], q.get("tf", "4h"), q.get("start"), q.get("end"),
+                                          int(_clamped("limit", q.get("limit", MAX_BARS), 10, MAX_BARS))))
             if path == "/api/research":
                 p = ROOT / "RESEARCH.md"
                 return self._json({"markdown": p.read_text() if p.exists() else ""})
@@ -324,26 +527,49 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/healthz":
                 return self._json({"ok": True})
             self._json({"error": "not found"}, 404)
+        except (ValueError, KeyError) as e:
+            self._fail(e, 400)
+        except LookupError as e:
+            self._fail(e, 404)
         except Exception as e:
-            self._json({"error": f"{type(e).__name__}: {e}"}, 500)
+            self._fail(e, 500)
 
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            n = int(self.headers.get("Content-Length") or 0)
-            body = json.loads(self.rfile.read(n) or b"{}") if n else {}
-            jobs = {"/api/replay": ("replay", job_replay), "/api/backtest": ("backtest", job_backtest),
-                    "/api/paper/tick": ("paper_tick", job_paper_tick), "/api/data/refresh": ("refresh", job_refresh)}
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                raise ValueError("bad Content-Length") from None
+            if n < 0:
+                raise ValueError("bad Content-Length")
+            if n > MAX_BODY:
+                for _ in range(min(n, 10 * MAX_BODY) // 65536 + 1):  # drain so the client can read the 413
+                    self.rfile.read(65536)
+                self.close_connection = True
+                return self._json({"error": f"request body too large (max {MAX_BODY} bytes)"}, 413)
+            try:
+                body = json.loads(self.rfile.read(n) or b"{}") if n else {}
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                raise ValueError("request body is not valid JSON") from None
+            if not isinstance(body, dict):
+                raise ValueError("request body must be a JSON object")
+            jobs = {"/api/replay": ("replay", job_replay, validate_replay),
+                    "/api/backtest": ("backtest", job_backtest, validate_backtest),
+                    "/api/paper/tick": ("paper_tick", job_paper_tick, dict),
+                    "/api/data/refresh": ("refresh", job_refresh, dict)}
             if path in jobs:
-                kind, fn = jobs[path]
+                kind, fn, check = jobs[path]
                 if kind in ("paper_tick", "refresh") and (running := JOBS.busy(kind)):
                     return self._json(running)
+                body = check(body)
                 return self._json(JOBS.submit(kind, lambda log: fn(body, log)))
             if path == "/api/paper/reset":
                 d = _paper_cfg().dir
                 if d.exists():
                     for f in d.glob("*"):
-                        f.unlink()
+                        if f.is_file():
+                            f.unlink()
                 return self._json({"ok": True})
             if path == "/api/killswitch":
                 if body.get("on"):
@@ -352,8 +578,10 @@ class Handler(BaseHTTPRequestHandler):
                     KILL_SWITCH_FILE.unlink(missing_ok=True)
                 return self._json({"kill_switch": kill_switch_active()})
             self._json({"error": "not found"}, 404)
+        except (ValueError, KeyError) as e:
+            self._fail(e, 400)
         except Exception as e:
-            self._json({"error": f"{type(e).__name__}: {e}"}, 400)
+            self._fail(e, 500)
 
 
 def _auto_paper(stop: threading.Event) -> None:
@@ -368,6 +596,8 @@ def _auto_paper(stop: threading.Event) -> None:
 
 
 def serve(host: str = "127.0.0.1", port: int = 8050, auto_paper: bool = False) -> None:
+    global AUTO_PAPER
+    AUTO_PAPER = auto_paper
     httpd = ThreadingHTTPServer((host, port), Handler)
     stop = threading.Event()
     if auto_paper:

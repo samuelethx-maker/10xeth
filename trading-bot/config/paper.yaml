@@ -9,6 +9,7 @@ train_days: 365
 refit_days: 90
 history_days: 540      # 1h history fetched per tick (fit window + indicator warm-up)
 state_dir: results/paper
+execution: sim         # sim | dry_run (log intended orders) | live (orders on DEMO accounts; see docs/BROKERS.md)
 delay_minutes: 15      # Yahoo futures quotes are delayed ~10 min
 
 # MES (Micro E-mini, $5/pt) instead of ES ($50/pt): at $100k and 0.75% risk an ES
