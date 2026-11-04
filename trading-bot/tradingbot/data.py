@@ -22,6 +22,12 @@ COLUMNS = ["open", "high", "low", "close", "volume"]
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 
+def drop_unfinished(df: pd.DataFrame, bar: pd.Timedelta, now: pd.Timestamp | None = None) -> pd.DataFrame:
+    """Drop the still-forming last bar(s) returned by live feeds."""
+    now = now or pd.Timestamp.now(tz="UTC")
+    return df[df.index + bar <= now]
+
+
 def validate(df: pd.DataFrame) -> pd.DataFrame:
     missing = [c for c in COLUMNS if c not in df.columns]
     if missing:
@@ -32,6 +38,8 @@ def validate(df: pd.DataFrame) -> pd.DataFrame:
     df = df[~df.index.duplicated(keep="last")]
     if df.index.tz is None:
         df.index = df.index.tz_localize("UTC")
+    else:
+        df.index = df.index.tz_convert("UTC")
     df = df.dropna()
     df = df[(df[["open", "high", "low", "close"]] > 0).all(axis=1)]
     # Yahoo daily history sometimes has highs/lows that don't contain open/close.
@@ -120,7 +128,7 @@ def download_binance(symbol: str, interval: str = "1h", days: int = 365) -> pd.D
     df = pd.DataFrame(rows).iloc[:, :6]
     df.columns = ["time", *COLUMNS]
     df.index = pd.to_datetime(df.pop("time"), unit="ms", utc=True)
-    return validate(df)
+    return drop_unfinished(validate(df), pd.Timedelta(interval))
 
 
 def download_oanda(instrument: str, granularity: str = "H1", days: int = 365) -> pd.DataFrame:
@@ -228,7 +236,8 @@ def download_yahoo(ticker: str, interval: str = "1h", period: str = "730d") -> p
         raise RuntimeError(f"no Yahoo data for {ticker}")
     df.columns = [c.lower() for c in df.columns]
     df.index = pd.to_datetime(df.index, utc=True)
-    return validate(df)
+    df = validate(df)
+    return drop_unfinished(df, pd.Timedelta(hours=1)) if interval == "1h" else df
 
 
 def download_funding(symbol: str, start: str = "2019-09-01") -> pd.Series:
@@ -270,7 +279,11 @@ def download(inst: Instrument, days: int = 365, source: str = "auto", interval: 
         if not inst.dukascopy:
             raise ValueError(f"{inst.symbol} has no Dukascopy symbol")
         start = (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=days)).strftime("%Y-%m")
-        return download_dukascopy(inst.dukascopy, start)
+        df = download_dukascopy(inst.dukascopy, start)
+        # Dukascopy candles are BID; the engine adds half the spread around a mid
+        # price, so shift to an approximate mid to avoid flattering longs.
+        df[["open", "high", "low", "close"]] += inst.spread / 2
+        return df
     if source == "yahoo":
         if not inst.yahoo:
             raise ValueError(f"{inst.symbol} has no Yahoo ticker")
