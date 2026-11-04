@@ -1,0 +1,30 @@
+name: trading-bot
+
+on:
+  push:
+    paths: ["trading-bot/**", ".github/workflows/trading-bot.yml"]
+  pull_request:
+    paths: ["trading-bot/**", ".github/workflows/trading-bot.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: trading-bot
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: uv sync --locked --extra live
+      - name: Lint
+        run: uvx ruff@0.17.3 check tradingbot tests
+      - name: Tests
+        # Tests use synthetic data and mocks only; no network or broker credentials.
+        run: uv run pytest -q
