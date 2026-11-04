@@ -8,9 +8,9 @@
     }
   },
   "ports": {
-    "preview": 8000,
+    "preview": 8050,
     "additional": {
-      "trading": 8050
+      "site": 8000
     }
   },
   "services": [],
