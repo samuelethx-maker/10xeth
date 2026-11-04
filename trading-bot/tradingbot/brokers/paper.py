@@ -29,7 +29,7 @@ class PaperBroker(Broker):
     def position(self, inst: Instrument) -> float:
         return self._positions.get(inst.symbol, {}).get("qty", 0.0)
 
-    def market_order(self, inst, qty, stop=None, target=None) -> OrderResult:
+    def market_order(self, inst, qty, stop=None, target=None, client_id=None) -> OrderResult:
         price = self._prices.get(inst.symbol)
         if price is None:
             return OrderResult(False, message="no price set")
@@ -49,3 +49,30 @@ class PaperBroker(Broker):
         price = self._prices[inst.symbol]
         self._cash += (price - p["price"]) * p["qty"] * p["mult"]
         return OrderResult(True, str(next(self._ids)), price)
+
+    def positions(self) -> dict[str, float]:
+        return {s: p["qty"] for s, p in self._positions.items() if p["qty"]}
+
+    def price(self, inst: Instrument) -> float:
+        if inst.symbol not in self._prices:
+            raise RuntimeError("no price set")
+        return self._prices[inst.symbol]
+
+    def open_orders(self, inst: Instrument | None = None) -> list[dict]:
+        out = []
+        for s, p in self._positions.items():
+            if inst is not None and s != inst.symbol:
+                continue
+            out.append({"id": f"{s}-sl", "client_id": "", "symbol": s, "type": "stop", "price": p["stop"]})
+            if p["target"] is not None:
+                out.append({"id": f"{s}-tp", "client_id": "", "symbol": s, "type": "target", "price": p["target"]})
+        return out
+
+    def set_stop(self, inst, stop, target=None) -> OrderResult:
+        p = self._positions.get(inst.symbol)
+        if p is None:
+            return OrderResult(False, message="no open position")
+        p["stop"] = stop
+        if target is not None:
+            p["target"] = target
+        return OrderResult(True, message="stop updated")

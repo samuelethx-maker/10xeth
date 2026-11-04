@@ -32,6 +32,7 @@ GRIDS: dict[str, dict[str, list]] = {
     "trend": {"entry_n": [20, 55, 100], "exit_n": [10, 20, 40], "stop_atr": [2.0, 3.0]},
     "meanrev": {"bb_k": [1.5, 2.0, 2.5], "rsi_low": [10.0, 20.0], "target_atr": [2.0, 3.0]},
     "momentum": {"fast": [10, 20, 50], "slow": [100, 200], "chandelier_atr": [2.5, 3.5]},
+    "tsmom": {"lb_short": [10, 21, 42], "lb_long": [126, 252], "stop_atr": [3.0, 5.0]},
 }
 
 
@@ -163,8 +164,6 @@ def walk_forward(
     signals = strategy_signals(strategy, combos, bars, long_only)
 
     folds: list[Fold] = []
-    oos_trades: list[Trade] = []
-    oos_equity: list[pd.Series] = []
     cur_equity = equity
     start = 0
     while start + train + test <= len(bars):
@@ -174,8 +173,6 @@ def walk_forward(
         best, plateau = sel["best"], sel["plateau"]
         if best is None:
             # Nothing tradable in training: sit this fold out (flat equity).
-            flat = pd.Series(cur_equity, index=bars.index[te], name="equity")
-            oos_equity.append(flat)
             folds.append(Fold(bars.index[tr][0], bars.index[te][0], bars.index[te][-1], {},
                               sel["score"], plateau, 0.0, 0.0, 0))
             start += test
@@ -184,8 +181,6 @@ def walk_forward(
         res = run_backtest(bars.iloc[te], signals[best].iloc[te], inst, cur_equity, risk,
                            usd_quote_rate=usd_quote_rate, strategy_name=strategy,
                            funding=funding, financing=financing)
-        oos_trades.extend(res.trades)
-        oos_equity.append(res.equity)
         folds.append(Fold(
             bars.index[tr][0], bars.index[te][0], bars.index[te][-1], combos[best],
             float(scores[best]), plateau,
@@ -195,9 +190,18 @@ def walk_forward(
         cur_equity = float(res.equity.iloc[-1])
         start += test
 
-    eq = pd.concat(oos_equity) if oos_equity else pd.Series(dtype=float, name="equity")
-    oos = BacktestResult(inst.symbol, strategy, oos_trades, eq, equity)
-    return WalkForwardResult(inst.symbol, strategy, folds, oos)
+    if not folds:
+        empty = pd.Series(dtype=float, name="equity")
+        return WalkForwardResult(inst.symbol, strategy, folds, BacktestResult(inst.symbol, strategy, [], empty, equity))
+    # The headline out-of-sample result is ONE continuous account over the stitched
+    # test windows, so positions and risk state (peak equity, halts) carry across
+    # fold boundaries exactly as they would live. Per-fold runs above are diagnostics.
+    wf = WalkForwardResult(inst.symbol, strategy, folds, None)  # type: ignore[arg-type]
+    sig = stitched_signals(bars, wf, long_only)
+    oos = run_backtest(bars.loc[sig.index], sig, inst, equity, risk, usd_quote_rate=usd_quote_rate,
+                       strategy_name=strategy, funding=funding, financing=financing)
+    wf.oos = oos
+    return wf
 
 
 def stitched_signals(bars: pd.DataFrame, wf: WalkForwardResult, long_only: bool = False) -> pd.DataFrame:
