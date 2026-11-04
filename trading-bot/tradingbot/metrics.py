@@ -56,3 +56,18 @@ def format_table(rows: list[dict]) -> str:
             "profit_factor", "win_rate_pct", "avg_r", "sharpe", "folds", "pos_folds_pct",
             "plateau", "neighbour", "accepted"]
     return df[[c for c in cols if c in df.columns]].round(2).to_string(index=False)
+
+
+def bootstrap_pf(pnls, n: int = 2000, seed: int = 0, ci: float = 0.95) -> tuple[float, float]:
+    """Bootstrap confidence interval for the profit factor by resampling trades with
+    replacement. Ignores serial correlation between trades, so it is if anything too narrow."""
+    pnls = np.asarray(pnls, float)
+    if len(pnls) < 10:
+        return float("nan"), float("nan")
+    rng = np.random.default_rng(seed)
+    samples = pnls[rng.integers(0, len(pnls), size=(n, len(pnls)))]
+    gains = np.where(samples > 0, samples, 0).sum(axis=1)
+    losses = -np.where(samples < 0, samples, 0).sum(axis=1)
+    pf = np.where(losses > 0, gains / np.where(losses > 0, losses, 1), np.inf)
+    lo, hi = np.quantile(pf, [(1 - ci) / 2, 1 - (1 - ci) / 2])
+    return float(lo), float(hi)
