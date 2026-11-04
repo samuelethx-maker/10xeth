@@ -49,13 +49,17 @@ class PaperConfig:
     state_dir: str = "results/paper"
     delay_minutes: int = 15  # wait after bar close for delayed feeds
     min_train_score: float | None = None  # sit a market out unless training score > this
+    execution: str = "sim"  # sim (simulated fills only) | dry_run (log intended orders) | live (demo broker orders)
     risk: RiskConfig = field(default_factory=RiskConfig)
 
     @classmethod
     def load(cls, path: str | Path) -> PaperConfig:
         d = yaml.safe_load(Path(path).read_text()) or {}
         risk = RiskConfig(**d.pop("risk", {}))
-        return cls(risk=risk, **d)
+        cfg = cls(risk=risk, **d)
+        if cfg.execution not in ("sim", "dry_run", "live"):
+            raise ValueError(f"execution must be sim|dry_run|live, got {cfg.execution!r}")
+        return cfg
 
     @property
     def min_score(self) -> float:
@@ -88,9 +92,12 @@ class PaperTrader:
     def __init__(self, cfg: PaperConfig,
                  fetch: Callable[[Instrument, int], pd.DataFrame] = fetch_live,
                  fetch_fund: Callable[[Instrument, pd.Timestamp], pd.Series | None] = fetch_funding,
-                 log: Callable[[str], None] = print):
+                 log: Callable[[str], None] = print,
+                 broker_factory: Callable[[str], object] | None = None):
         self.cfg = cfg
         self.fetch, self.fetch_fund, self.log = fetch, fetch_fund, log
+        self.broker_factory = broker_factory
+        self._brokers: dict[str, object] = {}
         self.cfg.dir.mkdir(parents=True, exist_ok=True)
         self.state_path = self.cfg.dir / "state.json"
         self.state = self._load()
@@ -184,11 +191,43 @@ class PaperTrader:
             self.log(f"[risk] {e}")
         eng.rm.events.clear()
         self._save()
+        if self.cfg.execution != "sim":
+            self.execute()
         summary = {"now": now, "new_bars": sum(len(l.times) for l in new_legs),
                    "closed_trades": len(eng.trades), "equity": eng.equity(),
                    "open": list(eng.pos), "pending": list(eng.pending_entry)}
         self.write_report(now)
         return summary
+
+    # -------------------------------------------------------- execution
+    def _broker(self, name: str):
+        if name not in self._brokers:
+            factory = self.broker_factory
+            if factory is None:
+                from .brokers import get_broker as factory
+            self._brokers[name] = factory(name)
+        return self._brokers[name]
+
+    def execute(self, dry_run: bool | None = None) -> list[dict]:
+        """Mirror Engine positions onto the demo brokers. Never raises (a tick must survive)."""
+        from .execution import Reconciler, desired_from_engine
+
+        if dry_run is None:
+            dry_run = self.cfg.execution != "live"
+        eng: Engine = self.state["engine_obj"]
+        brokers = {}
+        for name in sorted({get_instrument(s).broker for s in self.cfg.legs}):
+            try:
+                brokers[name] = self._broker(name)
+            except Exception as e:  # noqa: BLE001 - missing env vars, TWS down, live-URL guard...
+                self.log(f"[exec] {name} broker unavailable, skipping its instruments: {e}")
+        rec = Reconciler(brokers, dry_run=dry_run, orders_path=self.cfg.dir / "orders.jsonl", log=self.log)
+        try:
+            return rec.reconcile(desired_from_engine(eng), self.cfg.legs, dict(eng.last_close),
+                                 eng.usdjpy if np.isfinite(eng.usdjpy) else 150.0)
+        except Exception as e:  # noqa: BLE001
+            self.log(f"[exec] reconcile failed: {e}")
+            return []
 
     # ----------------------------------------------------------- report
     def write_report(self, now: pd.Timestamp) -> str:
