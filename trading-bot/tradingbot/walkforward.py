@@ -32,6 +32,7 @@ GRIDS: dict[str, dict[str, list]] = {
     "trend": {"entry_n": [20, 55, 100], "exit_n": [10, 20, 40], "stop_atr": [2.0, 3.0]},
     "meanrev": {"bb_k": [1.5, 2.0, 2.5], "rsi_low": [10.0, 20.0], "target_atr": [2.0, 3.0]},
     "momentum": {"fast": [10, 20, 50], "slow": [100, 200], "chandelier_atr": [2.5, 3.5]},
+    "tsmom": {"lb_short": [10, 21, 42], "lb_long": [126, 252], "stop_atr": [3.0, 5.0]},
 }
 
 
